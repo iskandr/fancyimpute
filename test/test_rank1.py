@@ -1,4 +1,4 @@
-from fancyimpute import MatrixCompletion
+from fancyimpute import ConvexSolver
 import numpy as np
 
 
@@ -11,7 +11,7 @@ def test_rank1_outer_product():
     # drop one entry
     XY_missing[1, 2] = np.nan
 
-    XY_completed = MatrixCompletion().complete(XY_missing)
+    XY_completed = ConvexSolver().complete(XY_missing)
     assert abs(XY_completed[1, 2] - XY[1, 2]) < 0.001, \
         "Expected %0.4f but got %0.4f" % (
             XY[1, 2], XY_completed[1, 2])
@@ -28,7 +28,7 @@ def test_rank1_symmetric():
     missing = XYXY.copy()
     missing[1, 2] = np.nan
 
-    completed = MatrixCompletion(require_symmetric_solution=True).complete(missing)
+    completed = ConvexSolver(require_symmetric_solution=True).complete(missing)
     assert abs(completed[1, 2] - XYXY[1, 2]) < 0.001, \
         "Expected %0.4f but got %0.4f" % (
             XYXY[1, 2], completed[1, 2])

@@ -14,7 +14,7 @@ import cvxpy
 import numpy as np
 
 
-class MatrixCompletion(object):
+class ConvexSolver(object):
     """
     Simple implementation of "Exact Matrix Completion via Convex Optimization"
     by Emmanuel Candes and Benjamin Recht using cvxpy.
@@ -24,10 +24,12 @@ class MatrixCompletion(object):
             self,
             require_symmetric_solution=False,
             min_value=None,
-            max_value=None):
+            max_value=None,
+            error_tolerance=0.0):
         self.require_symmetric_solution = require_symmetric_solution
         self.min_value = min_value
         self.max_value = max_value
+        self.error_tolerance = error_tolerance
 
     def _check_input(self, X):
         if len(X.shape) != 2:
@@ -105,9 +107,8 @@ class MatrixCompletion(object):
     def complete(
             self,
             X,
-            fast_solver=True,
-            verbose=True,
-            error_tolerance=0.0):
+            fast_but_approximate=True,
+            verbose=True):
 
         """
         Expects 2d float matrix with NaN entries signifying missing values
@@ -117,7 +118,13 @@ class MatrixCompletion(object):
         self._check_input(X)
         m, n = X.shape
         S, objective = self._create_objective(m, n)
-        constraints = self._constraints(X, S, error_tolerance=error_tolerance)
+        constraints = self._constraints(
+            X=X,
+            S=S,
+            error_tolerance=self.error_tolerance)
         problem = cvxpy.Problem(objective, constraints)
-        problem.solve(verbose=True, solver=cvxpy.SCS if fast_solver else None)
+        problem.solve(
+            verbose=True,
+            # SCS solver is known to be faster but less exact
+            solver=cvxpy.SCS if fast_but_approximate else None)
         return self._get_solution(S)

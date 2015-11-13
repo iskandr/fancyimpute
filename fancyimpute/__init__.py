@@ -1,4 +1,4 @@
 from __future__ import absolute_import
-from .matrix_completion import MatrixCompletion
+from .convex_solver import ConvexSolver
 
-__all__ = ["MatrixCompletion"]
+__all__ = ["ConvexSolver"]

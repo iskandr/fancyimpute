@@ -7,14 +7,14 @@ Simple implementation of [Exact Matrix Completion via Convex Optimization](statw
 
 ```python
 
-from fancyimpute import MatrixCompletion
+from fancyimpute import ConvexSolver
 
-completion = MatrixCompletion(
+solver = ConvexSolver(
     min_value=0.0,
     max_value=1.0,
     error_tolerance=0.0005)
 
 # X_incomplete has missing data which is represented with NaN values
-X_filled = completion.complete(X_incomplete, verbose=True)
+X_filled = solver.complete(X_incomplete)
 ```
 
