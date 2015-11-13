@@ -1,7 +1,6 @@
 # fancyimpute
 
-Simple implementation of [Exact Matrix Completion via Convex Optimization](statweb.stanford.edu/~candes/papers/MatrixCompletion.pdf
-) by Emmanuel Candes and Benjamin Recht using cvxpy.
+Simple implementation of [Exact Matrix Completion via Convex Optimization](http://statweb.stanford.edu/%7Ecandes/papers/MatrixCompletion.pdf) by Emmanuel Candes and Benjamin Recht using cvxpy.
 
 ## Usage
 
