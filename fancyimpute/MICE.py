@@ -25,13 +25,13 @@ class MICE(object):
              visit_sequence = 'monotone', # order in which we visit the columns
              n_imputations=100,
              n_burn_in=10, # this many replicates will be thrown away
-             k=5, # number of nearest neighbors in PMM
+             n_neighbors=5, # number of nearest neighbors in PMM
              lam=1e-5, # ridge regression lambda
              impute_type='row'): # row means classic pmm, column means fill in linear preds :
         self.visit_sequence = visit_sequence
         self.n_imputations = n_imputations
         self.n_burn_in = n_burn_in
-        self.k = k
+        self.n_neighbors = n_neighbors
         self.lam = lam
         self.impute_type = impute_type
 
@@ -49,15 +49,15 @@ class MICE(object):
         """
         Does one entire round-robin set of updates.
         """
-        for col in self.visit_inds:
-            mm_col = self.mm[:,col] # missing mask for this column
-            if sum(mm_col) > 0: # if we have any missing data at all
-                om_col = self.om[:,col] # observed mask for this column
+        for col in self.visit_indices:
+            missing_mask_col = self.missing_mask[:,col] # missing mask for this column
+            if sum(missing_mask_col) > 0: # if we have any missing data at all
+                observed_mask_col = self.observed_mask[:,col] # observed mask for this column
                 # the columns we will use to predict the current one
                 other_cols = np.array(range(0,col) + range(col+1,self.d))
                 # only take rows for which we have observed vals for the current column
-                inputs = self.X_filled[om_col][:,other_cols]
-                output = self.X_filled[om_col,col]
+                inputs = self.X_filled[observed_mask_col][:,other_cols]
+                output = self.X_filled[observed_mask_col,col]
                 # fit a ridge model
                 brr = BayesianRidgeRegression(lam=self.lam)
                 brr.fit(inputs,output)
@@ -67,23 +67,23 @@ class MICE(object):
                 # and without this draw, the column algorithm doesn't work
                 if self.impute_type == 'row': # this is the PMM procedure
                     # predict values for missing values using random beta draw
-                    col_preds_missing = brr.predict(self.X_filled[mm_col][:,other_cols],'random_draw')
+                    col_preds_missing = brr.predict(self.X_filled[missing_mask_col][:,other_cols],'random_draw')
                     # predict values for observed values using best estimated beta
-                    col_preds_observed = brr.predict(self.X_filled[om_col][:,other_cols],None)
+                    col_preds_observed = brr.predict(self.X_filled[observed_mask_col][:,other_cols],None)
                     # for each missing value, find its nearest neighbors in the observed values
                     D = np.abs(col_preds_missing[:,np.newaxis] - col_preds_observed) # distances
                     # take top k neighbors
-                    # NN = np.argsort(D,1)[:,:self.k] too slooooow
-                    k = np.minimum(self.k, len(col_preds_observed)-1)
+                    k = np.minimum(self.n_neighbors, len(col_preds_observed)-1)
+                    # NN = np.argsort(D,1)[:,:k] too slooooow
                     NN = np.argpartition(D,k,1)[:,:k] # <- bottleneck!
                     # pick one of the 5 nearest neighbors at random! that's right! not even an average
                     NN_sampled = [np.random.choice(NN_row) for NN_row in NN]
                     # set the missing values to be the values of the  nearest neighbor in the output space
-                    self.X_filled[mm_col,col] = self.X_filled[om_col,col][NN_sampled]
+                    self.X_filled[missing_mask_col,col] = self.X_filled[observed_mask_col,col][NN_sampled]
                 elif self.impute_type == 'col':
                     # predict values for missing values using posterior predictive draws
                     # see the end of this: https://www.cs.utah.edu/~fletcher/cs6957/lectures/BayesianLinearRegression.pdf
-                    self.X_filled[mm_col,col] = brr.posterior_predictive_draw(self.X_filled[mm_col][:,other_cols]) # <- bottleneck!
+                    self.X_filled[missing_mask_col,col] = brr.posterior_predictive_draw(self.X_filled[missing_mask_col][:,other_cols]) # <- bottleneck!
             
     def complete(
         self,
@@ -99,31 +99,31 @@ class MICE(object):
         """
         
         self._check_input(X)
-        self.mm = np.isnan(X) # missing mask
-        self._check_missing_value_mask(self.mm)
-        self.om = ~self.mm # observed mask
+        self.missing_mask = np.isnan(X) 
+        self._check_missing_value_mask(self.missing_mask)
+        self.observed_mask = ~self.missing_mask 
         self.d = X.shape[1]
         
         # Decide what order we will update the columns.
         # As a homage to the MICE package, we will have 4 options of how to order the updates.
         if self.visit_sequence == 'roman':
-            self.visit_inds = np.arange(self.d)
+            self.visit_indices = np.arange(self.d)
         elif self.visit_sequence == 'arabic':
-            self.visit_inds = np.arange(self.d-1,-1,-1) # same as np.arange(d)[::-1]
+            self.visit_indices = np.arange(self.d-1,-1,-1) # same as np.arange(d)[::-1]
         elif self.visit_sequence == 'monotone':
-            self.visit_inds = np.argsort(self.mm.sum(0))[::-1]
+            self.visit_indices = np.argsort(self.missing_mask.sum(0))[::-1]
         elif self.visit_sequence == 'revmonotone':
-            self.visit_inds = np.argsort(self.mm.sum(0))
+            self.visit_indices = np.argsort(self.missing_mask.sum(0))
         else:
-            self.visit_inds = np.arange(self.d)
+            self.visit_indices = np.arange(self.d)
             
         # Initialize the missing values by simple samling from the same column.
         # It's what Stef what do
         self.X_filled = X.copy()
-        for col in self.visit_inds:
-            mm_col = self.mm[:,col]
-            om_col = self.om[:,col]
-            self.X_filled[mm_col,col] = np.random.choice(self.X_filled[om_col,col],sum(mm_col))
+        for col in self.visit_indices:
+            missing_mask_col = self.missing_mask[:,col]
+            observed_mask_col = self.observed_mask[:,col]
+            self.X_filled[missing_mask_col,col] = np.random.choice(self.X_filled[observed_mask_col,col],sum(missing_mask_col))
             
         # now we jam up in the usual fashion for n_burn_in + n_imputations iterations
         self.X_filled_storage = [] # all of the imputed values, in a flattened format
@@ -132,7 +132,7 @@ class MICE(object):
                 print "Run:", m
             self._perform_imputation_round()
             if m >= self.n_burn_in:
-                self.X_filled_storage.append(self.X_filled[self.mm])
+                self.X_filled_storage.append(self.X_filled[self.missing_mask])
     
-        return np.array(self.X_filled_storage), self.mm
+        return np.array(self.X_filled_storage), self.missing_mask
     

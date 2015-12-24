@@ -22,23 +22,23 @@ class BayesianRidgeRegression():
         # first add a column of all ones to X
         n,d = X_ones.shape
         # regularization matrix
-        regularization_mat = self.lam*np.eye(d)
-        regularization_mat[-1,-1] = 0 # don't need to regularize the offset
-        # the big expensive inverse - is there a better way?
-        self.inv_matrix = np.linalg.inv( np.dot(X_ones.T,X_ones) + regularization_mat ) 
+        regularization_matrix = self.lam*np.eye(d)
+        regularization_matrix[-1,-1] = 0 # don't need to regularize the intercept
+        # the big expensive inverse that we use over and over
+        self.inv_matrix = np.linalg.inv( np.dot(X_ones.T,X_ones) + regularization_matrix ) 
         # estimate of the parameters 
-        self.beta_est = np.dot(np.dot(self.inv_matrix,X_ones.T),y)
+        self.beta_estimate = np.dot(np.dot(self.inv_matrix,X_ones.T),y)
         # now we need the estimate of the noise variance
         # reference: https://stat.ethz.ch/R-manual/R-devel/library/stats/html/summary.lm.html
         residuals_sqr = (y - self.predict(X))**2
-        self.sigma_sqr_est = np.sum(residuals_sqr) / np.maximum((n-d),1)
+        self.sigma_squared_estimate = np.sum(residuals_sqr) / np.maximum((n-d),1)
     
     def predict(self,X,beta=None):
         X_ones = self.add_column_of_ones(X)
         if beta is not None:
             return np.dot(X_ones,self.random_beta_draw(1)[0])
         else:
-            return np.dot(X_ones,self.beta_est)
+            return np.dot(X_ones,self.beta_estimate)
         
     def add_column_of_ones(self,X):
         if len(X.shape) == 1:
@@ -52,16 +52,16 @@ class BayesianRidgeRegression():
     # note that the pros do wackier stuff: https://github.com/jwb133/smcfcs/blob/master/R/smcfcs.r
     # see lines 363 to 365. not sure what exactly is happening here
     def random_beta_draw(self,num_draws=1):
-        covar = self.sigma_sqr_est*self.inv_matrix
-        return np.random.multivariate_normal(self.beta_est,covar,num_draws)
+        covar = self.sigma_squared_estimate*self.inv_matrix
+        return np.random.multivariate_normal(self.beta_estimate,covar,num_draws)
         
     # posterior predictive draw
     def posterior_predictive_draw(self,X):
         X_ones = self.add_column_of_ones(X) # adding constant offset
         mu = self.predict(X)
-        covar = self.sigma_sqr_est*self.inv_matrix
+        covar = self.sigma_squared_estimate*self.inv_matrix
         draws = []
         for i,x_one in enumerate(X_ones):
-            sigma_sq = self.sigma_sqr_est + np.dot(np.dot(x_one,covar),x_one)
-            draws.append( np.random.normal(mu[i],np.sqrt(sigma_sq)) )
+            sigma_squared = self.sigma_squared_estimate + np.dot(np.dot(x_one,covar),x_one)
+            draws.append( np.random.normal(mu[i],np.sqrt(sigma_squared)) )
         return np.array(draws)
