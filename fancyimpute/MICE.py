@@ -13,8 +13,9 @@
 from __future__ import absolute_import
 import numpy as np
 from .bayesian_ridge_regression import BayesianRidgeRegression
+from .bayesian_regression import BayesianRegression
 
-class MICE(object):
+class MICE():
     """
     Basic implementation of MICE from R.
     This version assumes all of the columns are continuous,
@@ -26,14 +27,14 @@ class MICE(object):
              n_imputations=100,
              n_burn_in=10, # this many replicates will be thrown away
              n_neighbors=5, # number of nearest neighbors in PMM
-             lam=1e-5, # ridge regression lambda
-             impute_type='row'): # row means classic pmm, column means fill in linear preds :
+             impute_type='row',
+             model=BayesianRidgeRegression(lam=1e-5)): # row means classic pmm, column means fill in linear preds :
         self.visit_sequence = visit_sequence
         self.n_imputations = n_imputations
         self.n_burn_in = n_burn_in
         self.n_neighbors = n_neighbors
-        self.lam = lam
         self.impute_type = impute_type
+        self.model = model
 
     def _check_input(self, X):
         if len(X.shape) != 2:
@@ -59,7 +60,7 @@ class MICE(object):
                 inputs = self.X_filled[observed_mask_col][:,other_cols]
                 output = self.X_filled[observed_mask_col,col]
                 # fit a ridge model
-                brr = BayesianRidgeRegression(lam=self.lam)
+                brr = self.model
                 brr.fit(inputs,output)
                 # now we split between the row method (PMM) and the column method
                 # note: for the column method, we could use other regressors
@@ -67,9 +68,9 @@ class MICE(object):
                 # and without this draw, the column algorithm doesn't work
                 if self.impute_type == 'row': # this is the PMM procedure
                     # predict values for missing values using random beta draw
-                    col_preds_missing = brr.predict(self.X_filled[missing_mask_col][:,other_cols],'random_draw')
+                    col_preds_missing = brr.predict(self.X_filled[missing_mask_col][:,other_cols],random_draw=True)
                     # predict values for observed values using best estimated beta
-                    col_preds_observed = brr.predict(self.X_filled[observed_mask_col][:,other_cols],None)
+                    col_preds_observed = brr.predict(self.X_filled[observed_mask_col][:,other_cols],random_draw=False)
                     # for each missing value, find its nearest neighbors in the observed values
                     D = np.abs(col_preds_missing[:,np.newaxis] - col_preds_observed) # distances
                     # take top k neighbors
@@ -83,7 +84,9 @@ class MICE(object):
                 elif self.impute_type == 'col':
                     # predict values for missing values using posterior predictive draws
                     # see the end of this: https://www.cs.utah.edu/~fletcher/cs6957/lectures/BayesianLinearRegression.pdf
-                    self.X_filled[missing_mask_col,col] = brr.posterior_predictive_draw(self.X_filled[missing_mask_col][:,other_cols]) # <- bottleneck!
+                    #self.X_filled[missing_mask_col,col] = brr.posterior_predictive_draw(self.X_filled[missing_mask_col][:,other_cols]) 
+                    mus,sigmas_squared = brr.predict_dist(self.X_filled[missing_mask_col][:,other_cols])
+                    self.X_filled[missing_mask_col,col] = np.random.normal(mus,np.sqrt(sigmas_squared))
             
     def complete(
         self,
