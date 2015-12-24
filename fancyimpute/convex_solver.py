@@ -13,7 +13,6 @@
 import cvxpy
 import numpy as np
 
-
 class ConvexSolver(object):
     """
     Simple implementation of "Exact Matrix Completion via Convex Optimization"
