@@ -60,8 +60,6 @@ class BayesianRidgeRegression():
         X_ones = self.add_column_of_ones(X) # adding constant offset
         mu = self.predict(X)
         covar = self.sigma_squared_estimate*self.inv_matrix
-        draws = []
-        for i,x_one in enumerate(X_ones):
-            sigma_squared = self.sigma_squared_estimate + np.dot(np.dot(x_one,covar),x_one)
-            draws.append( np.random.normal(mu[i],np.sqrt(sigma_squared)) )
+        sigma_sq = self.sigma_squared_estimate + np.sum(np.dot(X_ones,covar)*X_ones, axis = 1)
+        draws = np.random.normal(mu,np.sqrt(sigma_sq))
         return np.array(draws)
