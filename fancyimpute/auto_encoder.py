@@ -22,11 +22,22 @@ from keras.layers.core import Dropout, Dense
 
 def make_reconstruction_loss(n_features):
     def reconstruction_loss(input_and_mask, y_pred):
-        original_values = input_and_mask[:, :n_features]
+        X_values = input_and_mask[:, :n_features]
+        X_values.name = "$X_values"
+
         missing_mask = input_and_mask[:, n_features:]
-        return mse(
-            y_true=original_values * (1 - missing_mask),
-            y_pred=y_pred * (1 - missing_mask))
+        missing_mask.name = "$missing_mask"
+
+        observed_mask = 1 - missing_mask
+        observed_mask.name = "$observed_mask"
+
+        X_values_observed = X_values * observed_mask
+        X_values_observed.name = "$X_values_observed"
+
+        pred_observed = y_pred * observed_mask
+        pred_observed.name = "$y_pred_observed"
+
+        return mse(y_true=X_values_observed, y_pred=pred_observed)
     return reconstruction_loss
 
 
@@ -46,7 +57,7 @@ def make_network(
             int(np.ceil(n_dims * (2.0 ** exponent)))
             for exponent in range(2, -2, -1)
         ]
-        print("hidden layer sizes", hidden_layer_sizes)
+        print("Hidden layer sizes: %s" % (hidden_layer_sizes,))
 
     nn = Sequential()
     first_layer_size = hidden_layer_sizes[0]
@@ -68,10 +79,13 @@ def make_network(
 
 
 def train_network(X, missing_mask, network, n_training_epochs, batch_size):
-    n_samples = len(X)
+    n_samples, n_features = X.shape
+    print("Training network %s with %d samples and %d features" % (
+        network,
+        n_samples,
+        n_features))
     indices = np.arange(n_samples)
     combined_data = np.hstack([X, missing_mask])
-
     for epoch in range(n_training_epochs):
         np.random.shuffle(indices)
         n_batches = n_samples // batch_size
@@ -80,11 +94,13 @@ def train_network(X, missing_mask, network, n_training_epochs, batch_size):
             batch_end_idx = (batch_idx + 1) * batch_size
             batch_indices = indices[batch_start_idx:batch_end_idx]
             X_batch = X[batch_indices, :]
-            print(X_batch.shape)
-            combined_batch = combined_data[batch_indices]
+            combined_batch = combined_data[batch_indices, :]
+            print("X_combined.shape = %s, X_value.shapes=%s" % (
+                combined_batch.shape,
+                X_batch.shape))
             network.train_on_batch(
                 X=combined_batch,
-                y=X_batch)
+                y=combined_batch)
 
 
 class AutoEncoder(object):
@@ -103,7 +119,7 @@ class AutoEncoder(object):
             hidden_layer_sizes=None,
             optimizer="rmsprop",
             dropout_probability=0.0,
-            batch_size=128,
+            batch_size=16,
             n_training_epochs=None):
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
@@ -157,17 +173,10 @@ class AutoEncoder(object):
         if not self.n_training_epochs:
             n_updates_per_epoch = int(np.ceil(n_samples / self.batch_size))
             # heuristic of ~1M updates for each model
-            epochs = int(np.ceil(10 ** 5 / n_updates_per_epoch))
+            epochs = min(1000, int(np.ceil(10 ** 5 / n_updates_per_epoch)))
         else:
             epochs = self.n_training_epochs
         X_with_mask = np.hstack([X, missing_mask])
-        self.network.fit(X_with_mask, X, nb_epoch=epochs)
-        """
-        train_network(
-            X=X,
-            missing_mask=missing_mask,
-            network=self.network,
-            n_training_epochs=epochs,
-            batch_size=self.batch_size)
-        """
+        print(X_with_mask.shape, X.shape)
+        self.network.fit(X_with_mask, X_with_mask, nb_epoch=epochs)
         return self.network.predict(X_with_mask)
