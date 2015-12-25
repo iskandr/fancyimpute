@@ -35,9 +35,9 @@ except:
 if __name__ == '__main__':
     setup(
         name='fancyimpute',
-        version="0.0.1",
-        description="Matrix completion using nuclear norm minimization",
-        author="Alex Rubinsteyn",
+        version="0.0.3",
+        description="Matrix completion and feature imputation algorithms",
+        author="Alex Rubinsteyn and Sergey Feldman",
         author_email="alex {dot} rubinsteyn {at} mssm {dot} edu",
         url="https://github.com/iskandr/fancyimpute",
         license="http://www.apache.org/licenses/LICENSE-2.0.html",
