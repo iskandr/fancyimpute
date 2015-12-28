@@ -180,7 +180,7 @@ class AutoEncoder(object):
         if not self.n_training_epochs:
             n_updates_per_epoch = int(np.ceil(n_samples / self.batch_size))
             # heuristic of ~1M updates for each model
-            epochs = min(1000, int(np.ceil(10 ** 5 / n_updates_per_epoch)))
+            epochs = min(2000, int(np.ceil(10 ** 5 / n_updates_per_epoch)))
         else:
             epochs = self.n_training_epochs
         X_with_observed_mask = np.hstack([X, missing_mask])
