@@ -124,7 +124,8 @@ class AutoEncoder(object):
             optimizer="rmsprop",
             dropout_probability=0,
             batch_size=16,
-            n_training_epochs=None):
+            n_training_epochs=None,
+            verbose=False):
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
         self.hidden_layer_sizes = hidden_layer_sizes
@@ -133,6 +134,7 @@ class AutoEncoder(object):
         self.batch_size = batch_size
         self.n_training_epochs = n_training_epochs
         self.hidden_layer_sizes = hidden_layer_sizes
+        self.verbose = verbose
 
         # network and its input size get set on first call to complete()
         self.network = None
@@ -178,12 +180,13 @@ class AutoEncoder(object):
         if not self.n_training_epochs:
             n_updates_per_epoch = int(np.ceil(n_samples / self.batch_size))
             # heuristic of ~1M updates for each model
-            epochs = min(2000, int(np.ceil(10 ** 5 / n_updates_per_epoch)))
+            epochs = min(1000, int(np.ceil(10 ** 5 / n_updates_per_epoch)))
         else:
             epochs = self.n_training_epochs
         X_with_observed_mask = np.hstack([X, missing_mask])
         self.network.fit(
             X=X_with_observed_mask,
             y=X_with_observed_mask,
-            nb_epoch=epochs)
+            nb_epoch=epochs,
+            verbose=self.verbose)
         return self.network.predict(X_with_observed_mask)

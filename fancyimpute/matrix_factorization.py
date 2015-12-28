@@ -1,3 +1,17 @@
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from __future__ import absolute_import, print_function, division
+
 import climate
 import downhill
 import numpy as np
@@ -24,7 +38,8 @@ class MatrixFactorization(object):
             patience=5,
             l1_penalty_weight=0.1,
             l2_penalty_weight=0.1,
-            max_gradient_norm=5):
+            max_gradient_norm=5,
+            verbose=False):
         self.k = k
         self.initializer = initializer
         self.learning_rate = learning_rate
@@ -32,7 +47,10 @@ class MatrixFactorization(object):
         self.l1_penalty_weight = l1_penalty_weight
         self.l2_penalty_weight = l2_penalty_weight
         self.max_gradient_norm = max_gradient_norm
-        climate.enable_default_logging()
+        self.verbose = verbose
+
+        if self.verbose:
+            climate.enable_default_logging()
 
     def _check_input(self, X):
         if len(X.shape) != 2:
