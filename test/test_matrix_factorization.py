@@ -1,15 +1,16 @@
 import numpy as np
-from fancyimpute import AutoEncoder
+from fancyimpute import MatrixFactorization
 
 from low_rank_data import create_rank_k_dataset
 
 
-def test_rank1_auto_encoder():
+def test_matrix_factorization_with_low_rank_random_matrix():
     XY, XY_incomplete, missing_mask = create_rank_k_dataset(
         n_rows=1000,
         n_cols=20,
+        k=3,
         fraction_missing=0.5)
-    XY_completed = AutoEncoder().complete(XY_incomplete)
+    XY_completed = MatrixFactorization().complete(XY_incomplete)
     print(XY)
     print(XY_completed)
     print(missing_mask)
@@ -20,4 +21,4 @@ def test_rank1_auto_encoder():
     assert missing_mae < 0.1, "Error too high!"
 
 if __name__ == "__main__":
-    test_rank1_auto_encoder()
+    test_matrix_factorization_with_low_rank_random_matrix()
