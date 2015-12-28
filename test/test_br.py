@@ -3,7 +3,7 @@ from fancyimpute import BayesianRegression
 from sklearn.linear_model import Ridge
 
 
-def test_brr_like_sklearn():
+def test_br_like_sklearn():
     n = 10000
     d = 10
     sigma_sqr = 5

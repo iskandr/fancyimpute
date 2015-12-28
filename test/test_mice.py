@@ -67,9 +67,4 @@ def test_rank1_symmetric():
         "Expected %0.4f but got %0.4f for column method with Segey's model" % (
             XY[1, 2], XY_completed_val)
 
-    #  row method doesn't work here!
-    #  XY_completed,mm = MICE(n_imputations=10,impute_type='row').complete(XY_missing)
-    #  XY_completed_val = XY_completed.mean()
-    #  assert abs(XY_completed_val - XYXY[1, 2]) < 0.001, \
-    #      "Expected %0.4f but got %0.4f for column method" % (
-    #          XYXY[1, 2], XY_completed_val)
+    # row method doesn't work with this simple problem

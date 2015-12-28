@@ -36,7 +36,7 @@ class BayesianRegression(object):
 
     '''
 
-    def __init__(self, bias_term=True, thresh=1e-5, lam=1e-5):
+    def __init__(self, bias_term=True, thresh=1e-3, lambda_reg=1e-5, lambda_0=1e-6):
 
         self.bias_term = bias_term
 
@@ -50,9 +50,13 @@ class BayesianRegression(object):
         self.D = None   # covariance
 
         self.thresh = thresh
-        self.lam = lam
+        self.lambda_reg = lambda_reg # for ridge regression
+        self.lambda_0 = lambda_0 # to avoid overflow
+        
+        # log-likelihood
+        self.logLike = [np.NINF]
 
-    def fit(self, X, Y, evidence_approx_method="EM", max_iter=100):
+    def fit(self, X, Y, evidence_approx_method="fixed-point", max_iter=100):
         '''
         Fits Bayesian linear regression, returns posterior mean and preision
         of parameters
@@ -90,12 +94,12 @@ class BayesianRegression(object):
         self.u, self.d, self.v = np.linalg.svd(self.X, full_matrices=False)
 
         # ridge penalty to avoid computational issues:
-        self.d += self.lam
+        self.d += self.lambda_reg
 
         # use type II maximum likelihood to find hyperparameters alpha and beta
         self._evidence_approx(max_iter=max_iter, method=evidence_approx_method)
 
-        # find parameters of posterior distribution after last ipdate of alpha & beta
+        # find parameters of posterior distribution after last update of alpha & beta
         self.w_mu, self.w_precision = self._posterior_params(self.alpha, self.beta)
         d = 1 / (self.beta * self.d ** 2 + self.alpha)
         self.D = np.dot(np.dot(self.v.T, np.diag(d)), self.v)
@@ -156,7 +160,7 @@ class BayesianRegression(object):
             mu_pred = np.dot(x, self.w_mu) + self.mu_Y
         return mu_pred
 
-    def _evidence_approx(self, max_iter=100, method="EM"):
+    def _evidence_approx(self, max_iter=100, method="fixed-point"):
         '''
         Performs evidence approximation , finds precision  parameters that maximize
         type II likelihood. There are two different fitting algorithms, namely EM
@@ -180,8 +184,6 @@ class BayesianRegression(object):
         # initial values of alpha and beta
         alpha, beta = np.random.random(2)
 
-        # store log likelihood at each iteration
-        log_likes = []
         dsq = self.d ** 2
 
         for i in range(max_iter):
@@ -193,7 +195,7 @@ class BayesianRegression(object):
 
             # precompute errors, since both methods use it in estimation
             error = self.Y - np.dot(self.X, mu)
-            sqdErr = np.dot(error, error)
+            sqdErr  = max(np.dot(error,error),self.lambda_0)
 
             if method == "fixed-point":
 
@@ -223,11 +225,11 @@ class BayesianRegression(object):
                 n / 2 * np.log(beta) -
                 1 / 2 * np.sum(np.log(beta * dsq + alpha)))
             log_like = normaliser - alpha / 2 * np.dot(mu, mu) - beta / 2 * sqdErr
-            log_likes.append(log_like)
+            self.logLike.append(log_like)
 
             # if change in log-likelihood is smaller than threshold stop iterations
             if i >= 1:
-                if log_likes[-1] - log_likes[-2] < self.thresh:
+                if self.logLike[-1] - self.logLike[-2] < self.thresh:
                     break
 
         # write optimal alpha and beta to instance variables
