@@ -36,13 +36,15 @@ class BayesianRegression(object):
 
     '''
 
-    def __init__(self, bias_term=True, thresh=1e-3, lambda_reg=1e-5, lambda_0=1e-6):
+    def __init__(self, bias_term=True, thresh=1e-3, lambda_reg=1e-5, lambda_0=1e-10, alpha = 1e-6,
+                                                                             beta  = 1e-6):
 
         self.bias_term = bias_term
 
         # precision parameters, they are calculated during evidence approximation
-        self.alpha = None
-        self.beta = None
+        self.alpha = alpha
+        self.beta = beta
+        self.lambda_0 = lambda_0 # to avoid overflow
 
         # mean and precision of posterior distribution of weights
         self.w_mu = None
@@ -51,7 +53,6 @@ class BayesianRegression(object):
 
         self.thresh = thresh
         self.lambda_reg = lambda_reg # for ridge regression
-        self.lambda_0 = lambda_0 # to avoid overflow
         
         # log-likelihood
         self.logLike = [np.NINF]
@@ -81,7 +82,7 @@ class BayesianRegression(object):
         '''
         parameters = {}
 
-        # center input data for simplicity of further computations
+        # center input and output data for simplicity of further computations
         self.mu_X = np.mean(X, axis=0)
         self.X = X - np.outer(self.mu_X, np.ones(X.shape[0])).T
         self.mu_Y = np.mean(Y)
@@ -93,7 +94,7 @@ class BayesianRegression(object):
         # and reuse it later
         self.u, self.d, self.v = np.linalg.svd(self.X, full_matrices=False)
 
-        # ridge penalty to avoid computational issues:
+        # ridge penalty to avoid computational issues
         self.d += self.lambda_reg
 
         # use type II maximum likelihood to find hyperparameters alpha and beta
@@ -160,81 +161,71 @@ class BayesianRegression(object):
             mu_pred = np.dot(x, self.w_mu) + self.mu_Y
         return mu_pred
 
-    def _evidence_approx(self, max_iter=100, method="fixed-point"):
+    def _evidence_approx(self,max_iter=100,method = "fixed-point"):
         '''
-        Performs evidence approximation , finds precision  parameters that maximize
+        Performs evidence approximation , finds precision  parameters that maximize 
         type II likelihood. There are two different fitting algorithms, namely EM
         and fixed-point algorithm, empirical evidence shows that fixed-point algorithm
         is faster than EM
-
+        
         Parameters:
         -----------
-
-        max_iter: int
+        max_iter: int (DEFAULT = 100)
               Maximum number of iterations
-
-        method: str
-              Can have only two values : "EM" or "fixed-point"
-
+        
+        method: str (DEFAULT = 'fixed-point')
+              Method that is used to fit model, can have only two values : "EM" or "fixed-point"
+        
         '''
+         # number of observations and number of paramters in model
+        n,m         = np.shape(self.X)
+        
+        # initial values of alpha and beta 
+        alpha, beta = self.alpha, self.beta
+        dsq         = self.d**2
 
-        # number of observations and number of paramters in model
-        n, m = np.shape(self.X)
-
-        # initial values of alpha and beta
-        alpha, beta = np.random.random(2)
-
-        dsq = self.d ** 2
-
+    
         for i in range(max_iter):
-
+            
             # find mean for posterior of w ( for EM this is E-step)
-            p1_mu = np.dot(self.v.T, np.diag(self.d / (dsq + alpha / beta)))
-            p2_mu = np.dot(self.u.T, self.Y)
-            mu = np.dot(p1_mu, p2_mu)
-
+            p1_mu   =  np.dot(self.v.T, np.diag(self.d/(dsq+alpha/beta)))
+            p2_mu   =  np.dot(self.u.T, self.Y)
+            mu      =  np.dot(p1_mu,p2_mu)
+        
             # precompute errors, since both methods use it in estimation
-            error = self.Y - np.dot(self.X, mu)
-            sqdErr  = max(np.dot(error,error),self.lambda_0)
-
-            if method == "fixed-point":
-
+            error   = self.Y - np.dot(self.X,mu)
+            sqdErr  = np.dot(error,error)
+            
+            if method == "fixed-point":           
                 # update gamma
-                gamma = np.sum(beta * dsq / (beta * dsq + alpha))
-
+                gamma      =  np.sum(dsq/(dsq + alpha/beta))
                 # use updated mu and gamma parameters to update alpha and beta
-                alpha = gamma / np.dot(mu, mu)
-                beta = (n - gamma) / sqdErr
-
-            elif method == "EM":
+                alpha      =   gamma  / np.dot(mu,mu) 
+                beta       =  ( n - gamma ) / sqdErr
+               
+            elif method == "EM":             
                 # M-step, update parameters alpha and beta
-                alpha = m / (np.dot(mu, mu) + np.sum(1 / (beta * dsq + alpha)))
-                beta = n / (sqdErr + np.sum(dsq / (beta * dsq + alpha)))
-
+                alpha      = m / (np.dot(mu,mu) + np.sum(1/(beta*dsq+alpha)))
+                beta       = n / ( sqdErr + np.sum(dsq/(beta*dsq + alpha))  )
             else:
                 raise ValueError("Only 'EM' and 'fixed-point' algorithms are implemented ")
-
-            # after alpha & beta are updated last time we should also update mu
-            p1_mu = np.dot(self.v.T, np.diag(self.d / (dsq + alpha / beta)))
-            p2_mu = np.dot(self.u.T, self.Y)
-            mu = np.dot(p1_mu, p2_mu)
+            
 
             # calculate log likelihood p(Y | X, alpha, beta) (constants are not included)
-            normaliser = (
-                m / 2 * np.log(alpha) +
-                n / 2 * np.log(beta) -
-                1 / 2 * np.sum(np.log(beta * dsq + alpha)))
-            log_like = normaliser - alpha / 2 * np.dot(mu, mu) - beta / 2 * sqdErr
+            normaliser =  0.5 * ( m*np.log(alpha) + n*np.log(beta) - np.sum(np.log(beta*dsq+alpha)))
+            log_like   =  normaliser - 0.5*alpha*np.sum(mu**2) - 0.5*beta*sqdErr - 0.5*n*np.log(2*np.pi)         
             self.logLike.append(log_like)
 
+            
             # if change in log-likelihood is smaller than threshold stop iterations
-            if i >= 1:
-                if self.logLike[-1] - self.logLike[-2] < self.thresh:
+            # if squared error is below threshold termonate, to avoide overflow in beta
+            if i >=1:
+                if self.logLike[-1] - self.logLike[-2] == self.thresh or sqdErr < self.lambda_0:
                     break
-
+        
         # write optimal alpha and beta to instance variables
         self.alpha = alpha
-        self.beta = beta
+        self.beta  = beta
 
     def _posterior_params(self, alpha, beta):
         '''
@@ -264,9 +255,9 @@ class BayesianRegression(object):
            Gaussian distribution
 
         '''
-        precision = beta * np.dot(self.X.T, self.X) + alpha
-        self.diag = self.d / (self.d ** 2 + alpha / beta)
-        p1 = np.dot(self.v.T, np.diag(self.diag))
-        p2 = np.dot(self.u.T, self.Y)
-        w_mu = np.dot(p1, p2)
-        return [w_mu, precision]
+        precision = beta*np.dot(self.X.T,self.X) + alpha*np.eye(self.X.shape[1])
+        self.diag = self.d/(self.d**2 + alpha/beta)
+        p1 = np.dot(self.v.T,np.diag(self.diag))
+        p2 = np.dot(self.u.T,self.Y)
+        w_mu = np.dot(p1,p2)
+        return [w_mu,precision]
