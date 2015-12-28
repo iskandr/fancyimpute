@@ -13,6 +13,8 @@ class MatrixFactorization(object):
     The U, V are found by minimizing the difference between U.dot.V and
     X at the observed entries along with a sparsity penalty for U and an
     L2 penalty for V.
+
+    Adapted from the example on http://downhill.readthedocs.org/en/stable/
     """
     def __init__(
             self,
