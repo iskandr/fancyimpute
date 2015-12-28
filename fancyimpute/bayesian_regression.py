@@ -53,7 +53,8 @@ class BayesianRegression(object):
 
         self.thresh = thresh
         self.lambda_reg = lambda_reg # for ridge regression
-        
+        self.lambda_0 = lambda_0 # to avoid overflow
+
         # log-likelihood
         self.logLike = [np.NINF]
 

@@ -15,6 +15,7 @@ from __future__ import absolute_import, print_function, division
 import cvxpy
 import numpy as np
 
+
 class ConvexSolver(object):
     """
     Simple implementation of "Exact Matrix Completion via Convex Optimization"

@@ -20,15 +20,17 @@ from keras.models import Sequential
 from keras.layers.core import Dropout, Dense
 
 
-def make_reconstruction_loss(n_features):
+def make_reconstruction_loss(n_features, mask_indicates_missing_values=False):
     def reconstruction_loss(input_and_mask, y_pred):
         X_values = input_and_mask[:, :n_features]
         X_values.name = "$X_values"
 
-        missing_mask = input_and_mask[:, n_features:]
-        missing_mask.name = "$missing_mask"
-
-        observed_mask = 1 - missing_mask
+        if mask_indicates_missing_values:
+            missing_mask = input_and_mask[:, n_features:]
+            missing_mask.name = "$missing_mask"
+            observed_mask = 1 - missing_mask
+        else:
+            observed_mask = input_and_mask[:, n_features:]
         observed_mask.name = "$observed_mask"
 
         X_values_observed = X_values * observed_mask
@@ -44,9 +46,9 @@ def make_reconstruction_loss(n_features):
 def make_network(
         n_dims,
         output_activation="linear",
-        hidden_activation="tanh",
+        hidden_activation="relu",
         hidden_layer_sizes=None,
-        dropout_probability=0.25,
+        dropout_probability=0,
         optimizer="rmsprop"):
     if not hidden_layer_sizes:
         # start with a layer larger than the input vector and its
@@ -55,7 +57,7 @@ def make_network(
         # generalization
         hidden_layer_sizes = [
             int(np.ceil(n_dims * (2.0 ** exponent)))
-            for exponent in range(2, -2, -1)
+            for exponent in range(4, -2, -1)
         ]
         print("Hidden layer sizes: %s" % (hidden_layer_sizes,))
 
@@ -73,7 +75,9 @@ def make_network(
             activation=hidden_activation))
         nn.add(Dropout(dropout_probability))
     nn.add(Dense(n_dims, activation=output_activation))
-    loss_function = make_reconstruction_loss(n_dims)
+    loss_function = make_reconstruction_loss(
+        n_dims,
+        mask_indicates_missing_values=True)
     nn.compile(optimizer=optimizer, loss=loss_function)
     return nn
 
@@ -114,13 +118,14 @@ class AutoEncoder(object):
 
     def __init__(
             self,
-            hidden_activation="relu",
+            hidden_activation="tanh",
             output_activation="linear",
             hidden_layer_sizes=None,
             optimizer="rmsprop",
-            dropout_probability=0.0,
+            dropout_probability=0,
             batch_size=16,
-            n_training_epochs=None):
+            n_training_epochs=None,
+            verbose=False):
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
         self.hidden_layer_sizes = hidden_layer_sizes
@@ -128,6 +133,8 @@ class AutoEncoder(object):
         self.dropout_probability = dropout_probability
         self.batch_size = batch_size
         self.n_training_epochs = n_training_epochs
+        self.hidden_layer_sizes = hidden_layer_sizes
+        self.verbose = verbose
 
         # network and its input size get set on first call to complete()
         self.network = None
@@ -173,10 +180,13 @@ class AutoEncoder(object):
         if not self.n_training_epochs:
             n_updates_per_epoch = int(np.ceil(n_samples / self.batch_size))
             # heuristic of ~1M updates for each model
-            epochs = min(1000, int(np.ceil(10 ** 5 / n_updates_per_epoch)))
+            epochs = min(2000, int(np.ceil(10 ** 5 / n_updates_per_epoch)))
         else:
             epochs = self.n_training_epochs
-        X_with_mask = np.hstack([X, missing_mask])
-        print(X_with_mask.shape, X.shape)
-        self.network.fit(X_with_mask, X_with_mask, nb_epoch=epochs)
-        return self.network.predict(X_with_mask)
+        X_with_observed_mask = np.hstack([X, missing_mask])
+        self.network.fit(
+            X=X_with_observed_mask,
+            y=X_with_observed_mask,
+            nb_epoch=epochs,
+            verbose=self.verbose)
+        return self.network.predict(X_with_observed_mask)
