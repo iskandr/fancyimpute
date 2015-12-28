@@ -18,6 +18,7 @@ import numpy as np
 from keras.objectives import mse
 from keras.models import Sequential
 from keras.layers.core import Dropout, Dense
+from keras.regularizers import l1l2
 
 
 def make_reconstruction_loss(n_features, mask_indicates_missing_values=False):
@@ -49,7 +50,9 @@ def make_network(
         hidden_activation="relu",
         hidden_layer_sizes=None,
         dropout_probability=0,
-        optimizer="rmsprop"):
+        optimizer="rmsprop",
+        l1_penalty=0,
+        l2_penalty=0):
     if not hidden_layer_sizes:
         # start with a layer larger than the input vector and its
         # mask of missing values and then transform down to a layer
@@ -66,15 +69,18 @@ def make_network(
     nn.add(Dense(
         first_layer_size,
         input_dim=2 * n_dims,
-        activation=hidden_activation))
+        activation=hidden_activation,
+        W_regularizer=l1l2(l1_penalty,l2_penalty)))
     nn.add(Dropout(dropout_probability))
 
     for layer_size in hidden_layer_sizes[1:]:
         nn.add(Dense(
             layer_size,
-            activation=hidden_activation))
+            activation=hidden_activation,
+            W_regularizer=l1l2(l1_penalty,l2_penalty)))
         nn.add(Dropout(dropout_probability))
-    nn.add(Dense(n_dims, activation=output_activation))
+    nn.add(Dense(n_dims, activation=output_activation,
+            W_regularizer=l1l2(l1_penalty,l2_penalty)))
     loss_function = make_reconstruction_loss(
         n_dims,
         mask_indicates_missing_values=True)
@@ -124,6 +130,8 @@ class AutoEncoder(object):
             optimizer="rmsprop",
             dropout_probability=0,
             batch_size=16,
+            l1_penalty=0,
+            l2_penalty=0,
             n_training_epochs=None,
             verbose=False):
         self.hidden_activation = hidden_activation
@@ -132,6 +140,8 @@ class AutoEncoder(object):
         self.optimizer = optimizer
         self.dropout_probability = dropout_probability
         self.batch_size = batch_size
+        self.l1_penalty = l1_penalty
+        self.l2_penalty = l2_penalty
         self.n_training_epochs = n_training_epochs
         self.hidden_layer_sizes = hidden_layer_sizes
         self.verbose = verbose
@@ -174,6 +184,8 @@ class AutoEncoder(object):
                 hidden_activation=self.hidden_activation,
                 hidden_layer_sizes=self.hidden_layer_sizes,
                 dropout_probability=self.dropout_probability,
+                l1_penalty=self.l1_penalty,
+                l2_penalty=self.l2_penalty,
                 optimizer=self.optimizer)
         assert self.network is not None, \
             "Network should have been constructed but was found to be None"

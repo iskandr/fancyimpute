@@ -27,3 +27,6 @@ def test_brr_like_sklearn():
 
     assert np.mean(np.abs(y_ts_brr - y_ts_rr)) < 0.001, \
         "Predictions are different from sklearn's ridge regression."
+
+if __name__ == "__main__":
+    test_brr_like_sklearn()
