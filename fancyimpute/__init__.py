@@ -1,12 +1,12 @@
 from __future__ import absolute_import
-from .convex_solver import ConvexSolver
+from .nuclear_norm_minimization import NuclearNormMinimization
 from .bayesian_ridge_regression import BayesianRidgeRegression
 from .bayesian_regression import BayesianRegression
 from .MICE import MICE
 from .auto_encoder import AutoEncoder
 from .matrix_factorization import MatrixFactorization
 __all__ = [
-    "ConvexSolver",
+    "NuclearNormMinimization",
     "BayesianRidgeRegression",
     "BayesianRegression",
     "MICE",

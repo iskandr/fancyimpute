@@ -16,7 +16,7 @@ import cvxpy
 import numpy as np
 
 
-class ConvexSolver(object):
+class NuclearNormMinimization(object):
     """
     Simple implementation of "Exact Matrix Completion via Convex Optimization"
     by Emmanuel Candes and Benjamin Recht using cvxpy.
@@ -129,4 +129,4 @@ class ConvexSolver(object):
             verbose=True,
             # SCS solver is known to be faster but less exact
             solver=cvxpy.SCS if fast_but_approximate else None)
-        return self._get_solution(S)
+        return np.array(self._get_solution(S))

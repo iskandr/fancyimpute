@@ -59,8 +59,9 @@ def make_network(
         # which is smaller than the input -- a bottleneck to force
         # generalization
         hidden_layer_sizes = [
-            int(np.ceil(n_dims * (2.0 ** exponent)))
-            for exponent in range(4, -2, -1)
+            8 * n_dims,
+            2 * n_dims,
+            int(np.ceil(0.5 * n_dims)),
         ]
         print("Hidden layer sizes: %s" % (hidden_layer_sizes,))
 
@@ -70,17 +71,20 @@ def make_network(
         first_layer_size,
         input_dim=2 * n_dims,
         activation=hidden_activation,
-        W_regularizer=l1l2(l1_penalty,l2_penalty)))
+        W_regularizer=l1l2(l1_penalty, l2_penalty)))
     nn.add(Dropout(dropout_probability))
 
     for layer_size in hidden_layer_sizes[1:]:
         nn.add(Dense(
             layer_size,
             activation=hidden_activation,
-            W_regularizer=l1l2(l1_penalty,l2_penalty)))
+            W_regularizer=l1l2(l1_penalty, l2_penalty)))
         nn.add(Dropout(dropout_probability))
-    nn.add(Dense(n_dims, activation=output_activation,
-            W_regularizer=l1l2(l1_penalty,l2_penalty)))
+    nn.add(
+        Dense(
+            n_dims,
+            activation=output_activation,
+            W_regularizer=l1l2(l1_penalty, l2_penalty)))
     loss_function = make_reconstruction_loss(
         n_dims,
         mask_indicates_missing_values=True)
@@ -129,7 +133,7 @@ class AutoEncoder(object):
             hidden_layer_sizes=None,
             optimizer="rmsprop",
             dropout_probability=0,
-            batch_size=16,
+            batch_size=32,
             l1_penalty=0,
             l2_penalty=0,
             n_training_epochs=None,
@@ -190,12 +194,15 @@ class AutoEncoder(object):
         assert self.network is not None, \
             "Network should have been constructed but was found to be None"
         if not self.n_training_epochs:
-            n_updates_per_epoch = int(np.ceil(n_samples / self.batch_size))
+            actual_batch_size = min(self.batch_size, n_samples)
+            n_updates_per_epoch = int(np.ceil(n_samples / actual_batch_size))
             # heuristic of ~1M updates for each model
-            epochs = min(2000, int(np.ceil(10 ** 5 / n_updates_per_epoch)))
+            epochs = int(np.ceil(0.5 * 10 ** 6 / n_updates_per_epoch))
+            print("Epochs: %d" % epochs)
         else:
             epochs = self.n_training_epochs
         X_with_observed_mask = np.hstack([X, missing_mask])
+
         self.network.fit(
             X=X_with_observed_mask,
             y=X_with_observed_mask,

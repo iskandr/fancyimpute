@@ -7,8 +7,9 @@ def create_rank_k_dataset(
         n_cols=5,
         k=3,
         fraction_missing=0.1,
-        symmetric=False):
-    np.random.seed(0)
+        symmetric=False,
+        random_seed=0):
+    np.random.seed(random_seed)
     x = np.random.randn(n_rows, k)
     y = np.random.randn(k, n_cols)
 
@@ -26,3 +27,11 @@ def create_rank_k_dataset(
     XY_incomplete[missing_mask] = np.nan
 
     return XY, XY_incomplete, missing_mask
+
+
+# create some default data to be shared across tests
+XY, XY_incomplete, missing_mask = create_rank_k_dataset(
+    n_rows=500,
+    n_cols=10,
+    k=3,
+    fraction_missing=0.25)

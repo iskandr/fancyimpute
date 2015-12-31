@@ -115,7 +115,7 @@ class MICE():
                     self.X_filled[missing_mask_col, col] = \
                         np.random.normal(mus, np.sqrt(sigmas_squared))
 
-    def complete(self, X, verbose=True):
+    def multiple_imputations(self, X, verbose=True):
         """
         Expects 2d float matrix with NaN entries signifying missing values
 
@@ -163,3 +163,11 @@ class MICE():
                 self.X_filled_storage.append(self.X_filled[self.missing_mask])
 
         return np.array(self.X_filled_storage), self.missing_mask
+
+    def complete(self, X, verbose=True):
+        X_multiple_imputations, missing_mask = self.multiple_imputations(
+            X, verbose)
+        X_completed = X.copy()
+        # average the imputed values for each feature
+        X_completed[missing_mask] = X_multiple_imputations.mean(axis=0)
+        return X_completed

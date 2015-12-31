@@ -29,6 +29,6 @@ def test_br_like_sklearn():
 
     assert br_error - rr_error < 0.1, \
         "Error is significantly worse than sklearn's ridge regression."
-        
+
 if __name__ == "__main__":
     test_br_like_sklearn()
