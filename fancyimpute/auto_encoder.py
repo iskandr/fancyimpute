@@ -11,7 +11,7 @@
 # limitations under the License.
 
 from __future__ import absolute_import, print_function, division
-
+from collections import deque
 
 import numpy as np
 
@@ -19,6 +19,8 @@ from keras.objectives import mse
 from keras.models import Sequential
 from keras.layers.core import Dropout, Dense
 from keras.regularizers import l1l2
+
+from .common import masked_mae
 
 
 def make_reconstruction_loss(n_features, mask_indicates_missing_values=False):
@@ -50,7 +52,7 @@ def make_network(
         hidden_activation="relu",
         hidden_layer_sizes=None,
         dropout_probability=0,
-        optimizer="rmsprop",
+        optimizer="adam",
         l1_penalty=0,
         l2_penalty=0):
     if not hidden_layer_sizes:
@@ -92,31 +94,6 @@ def make_network(
     return nn
 
 
-def train_network(X, missing_mask, network, n_training_epochs, batch_size):
-    n_samples, n_features = X.shape
-    print("Training network %s with %d samples and %d features" % (
-        network,
-        n_samples,
-        n_features))
-    indices = np.arange(n_samples)
-    combined_data = np.hstack([X, missing_mask])
-    for epoch in range(n_training_epochs):
-        np.random.shuffle(indices)
-        n_batches = n_samples // batch_size
-        for batch_idx in range(n_batches):
-            batch_start_idx = batch_idx * batch_size
-            batch_end_idx = (batch_idx + 1) * batch_size
-            batch_indices = indices[batch_start_idx:batch_end_idx]
-            X_batch = X[batch_indices, :]
-            combined_batch = combined_data[batch_indices, :]
-            print("X_combined.shape = %s, X_value.shapes=%s" % (
-                combined_batch.shape,
-                X_batch.shape))
-            network.train_on_batch(
-                X=combined_batch,
-                y=combined_batch)
-
-
 class AutoEncoder(object):
     """
     Neural network which takes as an input a vector of feature values and a
@@ -131,12 +108,11 @@ class AutoEncoder(object):
             hidden_activation="tanh",
             output_activation="linear",
             hidden_layer_sizes=None,
-            optimizer="rmsprop",
+            optimizer="adam",
             dropout_probability=0,
             batch_size=32,
             l1_penalty=0,
             l2_penalty=0,
-            n_training_epochs=None,
             verbose=False):
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
@@ -146,7 +122,6 @@ class AutoEncoder(object):
         self.batch_size = batch_size
         self.l1_penalty = l1_penalty
         self.l2_penalty = l2_penalty
-        self.n_training_epochs = n_training_epochs
         self.hidden_layer_sizes = hidden_layer_sizes
         self.verbose = verbose
 
@@ -164,48 +139,165 @@ class AutoEncoder(object):
         if missing.all():
             raise ValueError("Input matrix must have some non-missing values")
 
-    def complete(self, X, verbose=True):
-        """
-        Expects 2d float matrix with NaN entries signifying missing values
+    def _create_fresh_network(self, n_features):
+        return make_network(
+            n_dims=n_features,
+            output_activation=self.output_activation,
+            hidden_activation=self.hidden_activation,
+            hidden_layer_sizes=self.hidden_layer_sizes,
+            dropout_probability=self.dropout_probability,
+            l1_penalty=self.l1_penalty,
+            l2_penalty=self.l2_penalty,
+            optimizer=self.optimizer)
 
-        Returns completed matrix without any NaNs.
+    def _train_epoch(self, X, missing_mask, X_with_missing_mask=None):
         """
+        Trains the network for one pass over the data,
+        returns the network's predictions on the training data.
+        """
+        n_samples = len(X)
+        n_batches = int(np.ceil(n_samples / self.batch_size))
+        if X_with_missing_mask is None:
+            X_with_missing_mask = np.hstack([X, missing_mask])
+        indices = np.arange(n_samples)
+        np.random.shuffle(indices)
+        X_shuffled = X_with_missing_mask[indices]
+
+        for batch_idx in range(n_batches):
+            batch_start = batch_idx * self.batch_size
+            batch_end = (batch_idx + 1) * self.batch_size
+            batch_data = X_shuffled[batch_start:batch_end, :]
+            self.network.train_on_batch(
+                X=batch_data,
+                y=batch_data)
+        return self.network.predict(X_with_missing_mask)
+
+    def multiple_imputations(
+            self,
+            X,
+            X_complete=None,
+            hallucination_weight=0.0,
+            patience_epochs=None,
+            min_improvement=0.995,
+            max_training_epochs=None,
+            n_predictions=100,
+            missing_mask=None):
         self._check_input(X)
         (n_samples, n_features) = X.shape
 
-        missing_mask = np.isnan(X)
+        if missing_mask is None:
+            missing_mask = np.isnan(X)
         self._check_missing_value_mask(missing_mask)
+
+        if self.network_input_size != n_features:
+            # create a network for each distinct input size
+            self.network = self._create_fresh_network(n_features)
+            self.network_input_size = n_features
+
+        assert self.network is not None, \
+            "Network should have been constructed but was found to be None"
+
+        if not max_training_epochs:
+            actual_batch_size = min(self.batch_size, n_samples)
+            n_updates_per_epoch = int(np.ceil(n_samples / actual_batch_size))
+            # heuristic of ~1M updates for each model
+            max_training_epochs = int(np.ceil(10 ** 6 / n_updates_per_epoch))
+            if self.verbose:
+                print("Max Epochs: %d" % max_training_epochs)
+
+        if not patience_epochs:
+            patience_epochs = int(np.ceil(max_training_epochs / 100))
+            if self.verbose:
+                print("Default patience (# epochs before improvement): %d" % (
+                    patience_epochs,))
+
+        n_predictions = min(max_training_epochs, n_predictions)
 
         X = X.copy()
         # replace NaN's with 0
         X[missing_mask] = 0
 
-        if self.network_input_size != n_features:
-            # create a network for each distinct input size
-            self.network = make_network(
-                n_dims=n_features,
-                output_activation=self.output_activation,
-                hidden_activation=self.hidden_activation,
-                hidden_layer_sizes=self.hidden_layer_sizes,
-                dropout_probability=self.dropout_probability,
-                l1_penalty=self.l1_penalty,
-                l2_penalty=self.l2_penalty,
-                optimizer=self.optimizer)
-        assert self.network is not None, \
-            "Network should have been constructed but was found to be None"
-        if not self.n_training_epochs:
-            actual_batch_size = min(self.batch_size, n_samples)
-            n_updates_per_epoch = int(np.ceil(n_samples / actual_batch_size))
-            # heuristic of ~1M updates for each model
-            epochs = int(np.ceil(0.5 * 10 ** 6 / n_updates_per_epoch))
-            print("Epochs: %d" % epochs)
-        else:
-            epochs = self.n_training_epochs
-        X_with_observed_mask = np.hstack([X, missing_mask])
+        observed_mask = ~missing_mask
 
-        self.network.fit(
-            X=X_with_observed_mask,
-            y=X_with_observed_mask,
-            nb_epoch=epochs,
-            verbose=self.verbose)
-        return self.network.predict(X_with_observed_mask)
+        recent_errors = []
+        best_error_seen = np.inf
+        best_error_seen_median = np.inf
+        epochs_since_best_error = 0
+        recent_predictions = deque([], maxlen=n_predictions)
+
+        for epoch in range(max_training_epochs):
+            X_pred = self._train_epoch(X=X, missing_mask=missing_mask)
+            recent_predictions.append(X_pred)
+            observed_mae = masked_mae(
+                X_true=X,
+                X_pred=X_pred,
+                mask=observed_mask)
+
+            if X_complete is not None:
+                missing_mae = masked_mae(
+                    X_true=X_complete,
+                    X_pred=X_pred,
+                    mask=missing_mask)
+                print(
+                    ("Epoch %d/%d "
+                     "Training MAE=%0.4f "
+                     "Test MAE=%0.4f") % (
+                        epoch + 1,
+                        max_training_epochs,
+                        observed_mae,
+                        missing_mae))
+            if epoch == 0:
+                best_error_seen = observed_mae
+                recent_errors = [observed_mae]
+            elif observed_mae / best_error_seen_median < min_improvement:
+                best_error_seen = observed_mae
+                best_error_seen_median = np.median(recent_errors)
+                recent_errors = [observed_mae]
+                epochs_since_best_error = 0
+            else:
+                epochs_since_best_error += 1
+                recent_errors.append(observed_mae)
+
+            if patience_epochs and epochs_since_best_error > patience_epochs:
+                print(
+                    "Patience exceeded at epoch %d (best MAE=%0.4f)" % (
+                        epoch + 1,
+                        best_error_seen))
+                break
+
+            if hallucination_weight:
+                X[missing_mask] = (1.0 - hallucination_weight) * X[missing_mask]
+                X[missing_mask] += hallucination_weight * X_pred[missing_mask]
+        return recent_predictions
+
+    def complete(
+            self,
+            X,
+            X_complete=None,
+            hallucination_weight=0.0,
+            patience_epochs=None,
+            min_improvement=0.995,
+            max_training_epochs=None,
+            n_averaged_predictions=100):
+        """
+        Expects 2d float matrix with NaN entries signifying missing values
+
+        Returns completed matrix without any NaNs.
+        """
+
+        missing_mask = np.isnan(X)
+        X_result = X.copy()
+
+        recent_predictions = self.multiple_imputations(
+            X=X,
+            X_complete=X_complete,
+            hallucination_weight=hallucination_weight,
+            patience_epochs=patience_epochs,
+            min_improvement=min_improvement,
+            max_training_epochs=max_training_epochs,
+            n_predictions=n_averaged_predictions,
+            missing_mask=missing_mask)
+
+        X_mean_pred = np.mean(recent_predictions, axis=0)
+        X_result[missing_mask] = X_mean_pred[missing_mask]
+        return X_result

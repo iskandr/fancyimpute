@@ -36,8 +36,8 @@ class MatrixFactorization(object):
             initializer=np.random.randn,
             learning_rate=0.01,
             patience=5,
-            l1_penalty_weight=0.1,
-            l2_penalty_weight=0.1,
+            l1_penalty_weight=0.001,
+            l2_penalty_weight=0.001,
             max_gradient_norm=5,
             verbose=False):
         self.k = k
