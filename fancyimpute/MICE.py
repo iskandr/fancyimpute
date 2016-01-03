@@ -159,6 +159,7 @@ class MICE():
             if verbose:
                 print("Run:", m)
             self._perform_imputation_round()
+            break
             if m >= self.n_burn_in:
                 self.X_filled_storage.append(self.X_filled[self.missing_mask])
 

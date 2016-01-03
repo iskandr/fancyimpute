@@ -113,7 +113,7 @@ class AutoEncoder(object):
             batch_size=32,
             l1_penalty=0,
             l2_penalty=0,
-            verbose=False):
+            verbose=True):
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
         self.hidden_layer_sizes = hidden_layer_sizes
@@ -176,7 +176,7 @@ class AutoEncoder(object):
             self,
             X,
             X_complete=None,
-            hallucination_weight=0.0,
+            hallucination_weight=0.5,
             patience_epochs=None,
             min_improvement=0.995,
             max_training_epochs=None,
@@ -259,10 +259,11 @@ class AutoEncoder(object):
                 recent_errors.append(observed_mae)
 
             if patience_epochs and epochs_since_best_error > patience_epochs:
-                print(
-                    "Patience exceeded at epoch %d (best MAE=%0.4f)" % (
-                        epoch + 1,
-                        best_error_seen))
+                if self.verbose:
+                    print(
+                        "Patience exceeded at epoch %d (best MAE=%0.4f)" % (
+                            epoch + 1,
+                            best_error_seen))
                 break
 
             if hallucination_weight:
@@ -274,7 +275,7 @@ class AutoEncoder(object):
             self,
             X,
             X_complete=None,
-            hallucination_weight=0.0,
+            hallucination_weight=0.05,
             patience_epochs=None,
             min_improvement=0.995,
             max_training_epochs=None,

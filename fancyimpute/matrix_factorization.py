@@ -18,8 +18,10 @@ import numpy as np
 import theano
 import theano.tensor as T
 
+from .solver import Solver
 
-class MatrixFactorization(object):
+
+class MatrixFactorization(Solver):
     """
     Given an incomplete (m,n) matrix X, factorize it into
     U, V where U.shape = (m, k) and V.shape = (k, n).
@@ -34,12 +36,13 @@ class MatrixFactorization(object):
             self,
             k=10,
             initializer=np.random.randn,
-            learning_rate=0.01,
+            learning_rate=0.001,
             patience=5,
             l1_penalty_weight=0.001,
             l2_penalty_weight=0.001,
             max_gradient_norm=5,
-            verbose=False):
+            optimization_algorithm="adam",
+            verbose=True):
         self.k = k
         self.initializer = initializer
         self.learning_rate = learning_rate
@@ -47,20 +50,11 @@ class MatrixFactorization(object):
         self.l1_penalty_weight = l1_penalty_weight
         self.l2_penalty_weight = l2_penalty_weight
         self.max_gradient_norm = max_gradient_norm
+        self.optimization_algorithm = optimization_algorithm
         self.verbose = verbose
 
         if self.verbose:
             climate.enable_default_logging()
-
-    def _check_input(self, X):
-        if len(X.shape) != 2:
-            raise ValueError("Expected 2d matrix, got %s array" % (X.shape,))
-
-    def _check_missing_value_mask(self, missing):
-        if not missing.any():
-            raise ValueError("Input matrix is not missing any values")
-        if missing.all():
-            raise ValueError("Input matrix must have some non-missing values")
 
     def complete(self, X, verbose=True):
         """
@@ -102,6 +96,7 @@ class MatrixFactorization(object):
             loss=loss,
             train=[X],
             patience=self.patience,
+            algo=self.optimization_algorithm,
             batch_size=n_samples,
             max_gradient_norm=self.max_gradient_norm,  # Prevent gradient explosion!
             learning_rate=self.learning_rate,
