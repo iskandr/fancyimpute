@@ -34,17 +34,17 @@ class MatrixFactorization(Solver):
     """
     def __init__(
             self,
-            k=10,
+            rank=10,
             initializer=np.random.randn,
-            learning_rate=0.001,
+            learning_rate=0.01,
             patience=3,
             l1_penalty_weight=0.001,
             l2_penalty_weight=0.001,
             min_improvement=0.005,
-            max_gradient_norm=5,
+            max_gradient_norm=10,
             optimization_algorithm="adam",
             verbose=True):
-        self.k = k
+        self.rank = rank
         self.initializer = initializer
         self.learning_rate = learning_rate
         self.patience = patience
@@ -72,8 +72,8 @@ class MatrixFactorization(Solver):
         observed_mask = 1 - missing_mask
 
         # Set up a matrix factorization problem to optimize.
-        U_init = self.initializer(n_samples, self.k).astype(X.dtype)
-        V_init = self.initializer(self.k, n_features).astype(X.dtype)
+        U_init = self.initializer(n_samples, self.rank).astype(X.dtype)
+        V_init = self.initializer(self.rank, n_features).astype(X.dtype)
         U = theano.shared(U_init, name="U")
         V = theano.shared(V_init, name="V")
         X_symbolic = T.matrix(name="X", dtype=X.dtype)

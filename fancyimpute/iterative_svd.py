@@ -20,15 +20,15 @@ from .common import masked_mae
 class IterativeSVD(Solver):
     def __init__(
             self,
-            k,
+            rank,
             max_iters=100,
             n_imputations=1,
             init_fill_method="random",
             min_difference_between_iters=0.001,
             min_fraction_improvement=0.999,
-            patience=3,
+            patience=5,
             verbose=True):
-        self.k = k
+        self.rank = rank
         self.max_iters = max_iters
         self.n_imputations = n_imputations
         self.init_fill_method = init_fill_method
@@ -46,7 +46,7 @@ class IterativeSVD(Solver):
         best_solution = X_filled
         iters_since_best = 0
         for i in range(self.max_iters):
-            tsvd = TruncatedSVD(self.k)
+            tsvd = TruncatedSVD(self.rank)
             X_reduced = tsvd.fit_transform(X_filled)
             X_reconstructed = tsvd.inverse_transform(X_reduced)
             mae = masked_mae(
@@ -54,7 +54,9 @@ class IterativeSVD(Solver):
                 X_pred=X_reconstructed,
                 mask=observed_mask)
             if self.verbose:
-                print("Iter %d: observed MAE=%0.4f" % (i + 1, mae))
+                print(
+                    "[IterativeSVD] Iter %d: observed MAE=%0.6f" % (
+                        i + 1, mae))
             X_filled = X.copy()
             X_filled[missing_mask] = X_reconstructed[missing_mask]
             if i == 0:
@@ -67,7 +69,9 @@ class IterativeSVD(Solver):
                 iters_since_best = 0
             elif iters_since_best > self.patience:
                 if self.verbose:
-                    print("Patience exceeded on iter %d" % (i + 1))
+                    print(
+                        "[IterativeSVD] Patience exceeded on iter %d" % (
+                            i + 1,))
                 break
             else:
                 iters_since_best += 1

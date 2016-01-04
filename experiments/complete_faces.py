@@ -2,6 +2,7 @@
 import pylab
 from sklearn.datasets import fetch_olivetti_faces
 import numpy as np
+
 from fancyimpute import (
     AutoEncoder,
     MICE,
@@ -9,6 +10,7 @@ from fancyimpute import (
     NuclearNormMinimization,
     SimpleFill,
     IterativeSVD,
+    SoftImpute,
 )
 
 
@@ -36,6 +38,21 @@ def load_faces_data(
     return full_faces_matrix, incomplete_faces_matrix
 
 
+def save_images(
+        images,
+        imshape=(64, 64),
+        image_indices=[0, 100, 200],
+        base_filename=None):
+    for i in image_indices:
+        fig, ax = pylab.subplots(1, 1)
+        image = images[i, :].copy().reshape(imshape)
+        image[np.isnan(image)] = 0
+        ax.imshow(image, cmap="gray")
+        if base_filename:
+            filename = base_filename + "_%d" % (i) + ".png"
+            fig.savefig(filename)
+
+
 def compare_images(
         original,
         incomplete,
@@ -54,36 +71,33 @@ def compare_images(
 
 if __name__ == "__main__":
     original, incomplete = load_faces_data()
+    save_images(original, base_filename="original")
+    save_images(incomplete, base_filename="incomplete")
 
-    for fill_method in ["mean", "median", "random"]:
+    # SoftImpute without rank constraints
+    save_images(
+        SoftImpute().complete(incomplete),
+        base_filename="SoftImpute")
+
+    for rank in [5, 50]:
+        for solver_class in [IterativeSVD, SoftImpute, MatrixFactorization]:
+            solver = solver_class(rank=rank)
+            completed = solver.complete(incomplete)
+            save_images(
+                completed,
+                base_filename="%s_rank%d" % (solver_class.__name__, rank))
+        nn = AutoEncoder(
+            hidden_layer_sizes=[1000, rank],
+            hidden_activation="tanh",
+            output_activation="sigmoid")
+        completed_nn = nn.complete(incomplete)
+        save_images(
+            completed_nn,
+            base_filename="nn_rank%d" % rank)
+
+    for fill_method in ["mean", "median"]:
         filler = SimpleFill(fill_method=fill_method)
         completed_fill = filler.complete(incomplete)
-        compare_images(
-            original,
-            incomplete,
+        save_images(
             completed_fill,
             base_filename="simple_fill_%s" % fill_method)
-    for rank in [10, 20, 30, 40, 50]:
-        iterative_svd_solver = IterativeSVD(k=rank)
-        completed_svd = iterative_svd_solver.complete(incomplete)
-        compare_images(
-            original,
-            incomplete,
-            completed_svd,
-            base_filename="svd_rank%d" % rank)
-
-        iterative_svd_solver_with_averaging = IterativeSVD(k=rank, n_imputations=10)
-        completed_svd = iterative_svd_solver_with_averaging.complete(incomplete)
-        compare_images(
-            original,
-            incomplete,
-            completed_svd,
-            base_filename="svd_rank%d_averaging" % rank)
-
-        matrix_factorization_solver = MatrixFactorization(k=rank)
-        completed_mf = matrix_factorization_solver.complete(incomplete)
-        compare_images(
-            original,
-            incomplete,
-            completed_mf,
-            base_filename="matrix_factorization_rank%d" % rank)
