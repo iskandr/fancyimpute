@@ -21,3 +21,14 @@ def masked_mae(X_true, X_pred, mask):
 def masked_mse(X_true, X_pred, mask):
     masked_diff = X_true[mask] - X_pred[mask]
     return np.mean(masked_diff ** 2)
+
+
+def generate_random_column_samples(column):
+    col_mask = np.isnan(column)
+    n_missing = np.sum(col_mask)
+    mean = np.nanmean(column)
+    std = np.nanstd(column)
+    if np.isclose(std, 0):
+        return np.array([mean] * n_missing)
+    else:
+        return np.random.randn(n_missing) * std + mean

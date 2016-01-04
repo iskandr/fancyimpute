@@ -129,4 +129,7 @@ class NuclearNormMinimization(object):
             verbose=True,
             # SCS solver is known to be faster but less exact
             solver=cvxpy.SCS if fast_but_approximate else None)
-        return np.array(self._get_solution(S))
+        return self.clip_result(
+            S.value,
+            min_value=self.min_value,
+            max_value=self.max_value)

@@ -37,9 +37,10 @@ class MatrixFactorization(Solver):
             k=10,
             initializer=np.random.randn,
             learning_rate=0.001,
-            patience=5,
+            patience=3,
             l1_penalty_weight=0.001,
             l2_penalty_weight=0.001,
+            min_improvement=0.005,
             max_gradient_norm=5,
             optimization_algorithm="adam",
             verbose=True):
@@ -51,6 +52,7 @@ class MatrixFactorization(Solver):
         self.l2_penalty_weight = l2_penalty_weight
         self.max_gradient_norm = max_gradient_norm
         self.optimization_algorithm = optimization_algorithm
+        self.min_improvement = min_improvement
         self.verbose = verbose
 
         if self.verbose:
@@ -62,16 +64,11 @@ class MatrixFactorization(Solver):
 
         Returns completed matrix without any NaNs.
         """
-        self._check_input(X)
-        (n_samples, n_features) = X.shape
+        X, missing_mask = self.prepare_data(X, inplace=False)
 
-        missing_mask = np.isnan(X)
-        self._check_missing_value_mask(missing_mask)
-
-        X = X.copy()
         # replace NaN's with 0
         X[missing_mask] = 0
-
+        (n_samples, n_features) = X.shape
         observed_mask = 1 - missing_mask
 
         # Set up a matrix factorization problem to optimize.
@@ -98,14 +95,16 @@ class MatrixFactorization(Solver):
             patience=self.patience,
             algo=self.optimization_algorithm,
             batch_size=n_samples,
+            min_improvement=self.min_improvement,
             max_gradient_norm=self.max_gradient_norm,  # Prevent gradient explosion!
             learning_rate=self.learning_rate,
             monitors=(('err', err.mean()),    # Monitor during optimization.
                       ('|u|<0.1', (abs(U) < 0.1).mean()),
                       ('|v|<0.1', (abs(U) < 0.1).mean())),
-            monitor_gradients=True)
+            monitor_gradients=self.verbose)
 
         U_value = U.get_value()
         V_value = V.get_value()
         X_full = np.dot(U_value, V_value)
-        return X_full
+        X[missing_mask] = X_full[missing_mask]
+        return X

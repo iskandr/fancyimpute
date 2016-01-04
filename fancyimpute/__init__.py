@@ -8,6 +8,8 @@ from .bayesian_regression import BayesianRegression
 from .MICE import MICE
 from .auto_encoder import AutoEncoder
 from .matrix_factorization import MatrixFactorization
+from .iterative_svd import IterativeSVD
+from .simple_fill import SimpleFill
 
 __all__ = [
     "common",
@@ -18,4 +20,6 @@ __all__ = [
     "AutoEncoder",
     "MatrixFactorization",
     "Solver",
+    "SimpleFill",
+    "IterativeSVD",
 ]
