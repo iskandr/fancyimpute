@@ -39,14 +39,25 @@ class AutoEncoder(Solver):
             batch_size=32,
             l1_penalty=0,
             l2_penalty=0,
-            n_imputations=1,
-            hallucination_weight=0.5,
+            recurrent_weight=0.5,
+            output_history_size=5,
             patience_epochs=10,
             min_improvement=0.995,
             max_training_epochs=None,
             init_fill_method="zero",
+            n_imputations=1,
+            normalize_columns=True,
+            min_value=None,
+            max_value=None,
             verbose=True):
-        Solver.__init__(self, n_imputations=n_imputations)
+        Solver.__init__(
+            self,
+            fill_method=init_fill_method,
+            normalize_columns=normalize_columns,
+            n_imputations=n_imputations,
+            min_value=min_value,
+            max_value=max_value)
+
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
         self.hidden_layer_sizes = hidden_layer_sizes
@@ -56,11 +67,11 @@ class AutoEncoder(Solver):
         self.l1_penalty = l1_penalty
         self.l2_penalty = l2_penalty
         self.hidden_layer_sizes = hidden_layer_sizes
-        self.hallucination_weight = hallucination_weight
+        self.recurrent_weight = recurrent_weight
+        self.output_history_size = output_history_size
         self.patience_epochs = patience_epochs
         self.min_improvement = min_improvement
         self.max_training_epochs = max_training_epochs
-        self.init_fill_method
         self.verbose = verbose
 
         # network and its input size get set on first call to complete()
@@ -100,29 +111,13 @@ class AutoEncoder(Solver):
                 y=batch_data)
         return self.network.predict(X_with_missing_mask)
 
-    def multiple_imputations(
-            self,
-            X,
-            X_complete=None):
-        X, missing_mask = self.prepare_data(
-            X, inplace=False,
-            fill_method=self.init_fill_method)
-
-        n_samples, n_features = X.shape
-
-        if self.network_input_size != n_features:
-            # create a network for each distinct input size
-            self.network = self._create_fresh_network(n_features)
-            self.network_input_size = n_features
-
-        assert self.network is not None, \
-            "Network should have been constructed but was found to be None"
-
+    def _get_training_params(self, n_samples):
         if not self.max_training_epochs:
             actual_batch_size = min(self.batch_size, n_samples)
             n_updates_per_epoch = int(np.ceil(n_samples / actual_batch_size))
             # heuristic of ~1M updates for each model
-            max_training_epochs = int(np.ceil(10 ** 6 / n_updates_per_epoch))
+            max_training_epochs = int(
+                np.ceil(0.5 * 10 ** 6 / n_updates_per_epoch))
             if self.verbose:
                 print("Max Epochs: %d" % max_training_epochs)
         else:
@@ -136,11 +131,21 @@ class AutoEncoder(Solver):
         else:
             patience_epochs = self.patience_epochs
 
-        n_imputations = min(max_training_epochs, self.n_imputations)
+        return max_training_epochs, patience_epochs
 
-        X = X.copy()
-        # replace NaN's with 0
-        X[missing_mask] = 0
+    def solve(self, X, missing_mask):
+        n_samples, n_features = X.shape
+
+        if self.network_input_size != n_features:
+            # create a network for each distinct input size
+            self.network = self._create_fresh_network(n_features)
+            self.network_input_size = n_features
+
+        assert self.network is not None, \
+            "Network should have been constructed but was found to be None"
+
+        max_training_epochs, patience_epochs = self._get_training_params(
+            n_samples)
 
         observed_mask = ~missing_mask
 
@@ -148,7 +153,7 @@ class AutoEncoder(Solver):
         best_error_seen = np.inf
         best_error_seen_median = np.inf
         epochs_since_best_error = 0
-        recent_predictions = deque([], maxlen=n_imputations)
+        recent_predictions = deque([], maxlen=self.output_history_size)
 
         for epoch in range(max_training_epochs):
             X_pred = self._train_epoch(X=X, missing_mask=missing_mask)
@@ -158,19 +163,6 @@ class AutoEncoder(Solver):
                 X_pred=X_pred,
                 mask=observed_mask)
 
-            if X_complete is not None:
-                missing_mae = masked_mae(
-                    X_true=X_complete,
-                    X_pred=X_pred,
-                    mask=missing_mask)
-                print(
-                    ("Epoch %d/%d "
-                     "Training MAE=%0.4f "
-                     "Test MAE=%0.4f") % (
-                        epoch + 1,
-                        max_training_epochs,
-                        observed_mae,
-                        missing_mae))
             if epoch == 0:
                 best_error_seen = observed_mae
                 recent_errors = [observed_mae]
@@ -191,9 +183,9 @@ class AutoEncoder(Solver):
                             best_error_seen))
                 break
 
-            if self.hallucination_weight:
-                old_weight = 1.0 - self.hallucination_weight
+            if self.recurrent_weight:
+                old_weight = 1.0 - self.recurrent_weight
                 X[missing_mask] = old_weight * X[missing_mask]
                 X[missing_mask] += (
-                    self.hallucination_weight * X_pred[missing_mask])
-        return recent_predictions
+                    self.recurrent_weight * X_pred[missing_mask])
+        return np.mean(recent_predictions, axis=0)

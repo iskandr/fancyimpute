@@ -14,7 +14,6 @@
 import numpy as np
 from sklearn.decomposition import randomized_svd
 
-
 from .common import masked_mae
 from .solver import Solver
 
@@ -42,8 +41,11 @@ class SoftImpute(Solver):
             convergence_threshold=0.001,
             max_iters=200,
             max_rank=None,
-            n_power_iterations=5,
+            n_power_iterations=1,
             init_fill_method="zero",
+            normalize_columns=True,
+            min_value=None,
+            max_value=None,
             n_imputations=1,
             verbose=True):
         """
@@ -66,9 +68,21 @@ class SoftImpute(Solver):
             Perform a truncated SVD on each iteration with this value as its
             rank.
 
+        n_power_iterations : int
+            Number of power iterations to perform with randomized SVD
+
         init_fill_method : str
             How to initialize missing values of data matrix, default is
             to fill them with zeros.
+
+        normalize_columns : bool
+            Rescale and center each feature before imputation
+
+        min_value : float
+            Smallest allowable value in the solution
+
+        max_value : float
+            Largest allowable value in the solution
 
         n_imputations : int
             Number of imputations to perform. Only makes sense if using a
@@ -77,13 +91,18 @@ class SoftImpute(Solver):
         verbose : bool
             Print debugging info
         """
-        Solver.__init__(self, n_imputations=n_imputations)
+        Solver.__init__(
+            self,
+            fill_method=init_fill_method,
+            n_imputations=n_imputations,
+            normalize_columns=normalize_columns,
+            min_value=min_value,
+            max_value=max_value)
         self.shrinkage_value = shrinkage_value
         self.convergence_threshold = convergence_threshold
         self.max_iters = max_iters
         self.max_rank = max_rank
         self.n_power_iterations = n_power_iterations
-        self.init_fill_method = init_fill_method
         self.verbose = verbose
 
     def _converged(self, X_old, X_new, missing_mask):
@@ -105,7 +124,7 @@ class SoftImpute(Solver):
             (U, s, V) = randomized_svd(
                 X,
                 max_rank,
-                n_iter=1)
+                n_iter=self.n_power_iterations)
         else:
             # perform a full rank SVD using ARPACK
             (U, s, V) = np.linalg.svd(
@@ -121,22 +140,43 @@ class SoftImpute(Solver):
         X_reconstruction = np.dot(U_thresh, np.dot(S_thresh, V_thresh))
         return X_reconstruction, rank
 
-    def _solve(self, X_init, missing_mask, shrinkage_value):
-        X_filled = X_init.copy()
-        previous_rank = self.max_rank
+    def _max_singular_value(self, X_filled):
+        # quick decomposition of X_filled into rank-1 SVD
+        _, s, _ = randomized_svd(
+            X_filled,
+            1,
+            n_iter=5)
+        return s[0]
+
+    def solve(self, X, missing_mask):
+        X_init = X.copy()
+
+        X_filled = X
+        observed_mask = ~missing_mask
+        max_singular_value = self._max_singular_value(X_filled)
+        if self.verbose:
+            print("[SoftImpute] Max Singular Value of X_init = %f" % (
+                max_singular_value))
+
+        if self.shrinkage_value:
+            shrinkage_value = self.shrinkage_value
+        else:
+            # totally hackish heuristic: keep only components
+            # with at least 1/50th the max singular value
+            shrinkage_value = max_singular_value / 50.0
+
         for i in range(self.max_iters):
             X_reconstruction, rank = self._svd_step(
                 X_filled,
                 shrinkage_value,
-                max_rank=previous_rank)
-            previous_rank = rank
+                max_rank=self.max_rank)
 
             # print error on observed data
             if self.verbose:
                 mae = masked_mae(
                     X_true=X_init,
                     X_pred=X_reconstruction,
-                    mask=~missing_mask)
+                    mask=observed_mask)
                 print(
                     "[SoftImpute] Iter %d: observed MAE=%0.6f rank=%d" % (
                         i + 1,
@@ -153,31 +193,5 @@ class SoftImpute(Solver):
             print("[SoftImpute] Stopped after iteration %d for lambda=%f" % (
                 i + 1,
                 shrinkage_value))
+
         return X_filled
-
-    def single_imputation(self, X):
-        X_filled, missing_mask = self.prepare_data(
-            X,
-            inplace=False,
-            fill_method=self.init_fill_method)
-        if self.shrinkage_value:
-            shrinkage_value = self.shrinkage_value
-        else:
-            # quick decomposition of X_filled into rank-1 SVD
-            _, s, _ = randomized_svd(
-                X_filled,
-                1,
-                n_iter=5)
-            max_singular_value = s[0]
-            # totally hackish heuristic: keep only components
-            # with at least 1/100th the max singular value
-            shrinkage_value = max_singular_value / 100
-            if self.verbose:
-                print("Initializing lambda=%f (lambda_max=%f)" % (
-                    shrinkage_value,
-                    max_singular_value))
-
-        return self._solve(
-            X_init=X_filled,
-            missing_mask=missing_mask,
-            shrinkage_value=shrinkage_value)

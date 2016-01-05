@@ -14,7 +14,7 @@ from .solver import Solver
 
 
 class SimpleFill(Solver):
-    def __init__(self, fill_method="mean"):
+    def __init__(self, fill_method="mean", min_value=None, max_value=None):
         """
         Possible values for fill_method:
             "zero": fill missing entries with zeros
@@ -23,11 +23,15 @@ class SimpleFill(Solver):
             "min": fill with min value per column
             "random": fill with gaussian noise according to mean/std of column
         """
-        self.fill_method = fill_method
+        Solver.__init__(
+            self,
+            normalize_columns=False,
+            fill_method=fill_method,
+            min_value=None,
+            max_value=None)
 
-    def complete(self, X):
-        X_complete, _ = self.prepare_data(
-            X,
-            inplace=False,
-            fill_method=self.fill_method)
-        return X_complete
+    def solve(self, X, missing_mask):
+        """
+        Since X is given to us already filled, just return it.
+        """
+        return X

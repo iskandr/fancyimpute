@@ -38,14 +38,23 @@ class MatrixFactorization(Solver):
             initializer=np.random.randn,
             learning_rate=0.01,
             patience=3,
-            l1_penalty_weight=0.001,
-            l2_penalty_weight=0.001,
+            l1_penalty_weight=0.005,
+            l2_penalty_weight=0.005,
             min_improvement=0.005,
             max_gradient_norm=10,
             optimization_algorithm="adam",
             n_imputations=1,
+            normalize_columns=True,
+            min_value=None,
+            max_value=None,
             verbose=True):
-        Solver.__init__(self, n_imputations=n_imputations)
+        Solver.__init__(
+            self,
+            fill_method="zero",
+            normalize_columns=normalize_columns,
+            min_value=min_value,
+            max_value=max_value,
+            n_imputations=n_imputations)
         self.rank = rank
         self.initializer = initializer
         self.learning_rate = learning_rate
@@ -60,11 +69,7 @@ class MatrixFactorization(Solver):
         if self.verbose:
             climate.enable_default_logging()
 
-    def single_imputation(self, X):
-        X, missing_mask = self.prepare_data(X, inplace=False)
-
-        # replace NaN's with 0
-        X[missing_mask] = 0
+    def solve(self, X, missing_mask):
         (n_samples, n_features) = X.shape
         observed_mask = 1 - missing_mask
 
@@ -100,6 +105,4 @@ class MatrixFactorization(Solver):
 
         U_value = U.get_value()
         V_value = V.get_value()
-        X_full = np.dot(U_value, V_value)
-        X[missing_mask] = X_full[missing_mask]
-        return X
+        return np.dot(U_value, V_value)

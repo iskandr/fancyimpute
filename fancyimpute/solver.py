@@ -10,14 +10,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import namedtuple
+
 import numpy as np
 
 from .common import generate_random_column_samples
 
 
+InputData = namedtuple("InputData", [
+    "X_original",
+    "X_rescaled",
+    "X_filled",
+    "missing_mask",
+    "column_means",
+    "column_scales"
+])
+
+
 class Solver(object):
-    def __init__(self, n_imputations=1):
+    def __init__(
+            self,
+            fill_method="zero",
+            n_imputations=1,
+            normalize_columns=False,
+            min_value=None,
+            max_value=None):
+        self.fill_method = fill_method
         self.n_imputations = n_imputations
+        self.normalize_columns = normalize_columns
+        self.min_value = min_value
+        self.max_value = max_value
 
     def _check_input(self, X):
         if len(X.shape) != 2:
@@ -39,7 +61,12 @@ class Solver(object):
             fill_values = col_fn(col_data)
             X[missing_col, col_idx] = fill_values
 
-    def fill(self, X, fill_method, inplace=False):
+    def fill(
+            self,
+            X,
+            missing_mask,
+            fill_method=None,
+            inplace=False):
         """
         Parameters
         ----------
@@ -59,11 +86,11 @@ class Solver(object):
         inplace : bool
             Modify matrix or fill a copy
         """
-        missing_mask = np.isnan(X)
-        self._check_missing_value_mask(missing_mask)
-
         if not inplace:
             X = X.copy()
+
+        if not fill_method:
+            fill_method = self.fill_method
 
         if fill_method not in ("zero", "mean", "median", "min", "random"):
             raise ValueError("Invalid fill method: '%s'" % (fill_method))
@@ -81,37 +108,88 @@ class Solver(object):
                 X,
                 missing_mask,
                 col_fn=generate_random_column_samples)
-        return X, missing_mask
-
-    def prepare_data(self, X, fill_method="zero", inplace=False):
-        """
-        Check to make sure that the input matrix and its mask of missing
-        values are valid, then fill the missing entries of X according to
-        the method specified by `fill_method`:
-            "zero": fill missing entries with zeros
-            "mean": fill with column means
-            "median" : fill with column medians
-            "min": fill with min value per column
-            "random": fill with gaussian noise according to mean/std of column
-
-        Returns initialized matrix X containing no NaN values and a mask of
-        where the values previously were.
-        """
-        X = np.asarray(X)
-        self._check_input(X)
-        return self.fill(X, fill_method=fill_method, inplace=inplace)
-
-    def clip_result(self, X, min_value=None, max_value=None):
-        X = np.asarray(X)
-        if min_value is not None:
-            X[X < min_value] = min_value
-        if max_value is not None:
-            X[X > max_value] = max_value
         return X
 
-    def single_imputation(self, X):
-        raise ValueError("%s.single_imputation not yet implemented!" % (
+    def prepare_input_data(self, X):
+        """
+        Check to make sure that the input matrix and its mask of missing
+        values are valid. Returns X and missing mask.
+        """
+        X = np.asarray(X)
+        if X.dtype != "f" and X.dtype != "d":
+            X = X.astype(float)
+
+        self._check_input(X)
+        missing_mask = np.isnan(X)
+        self._check_missing_value_mask(missing_mask)
+        return X, missing_mask
+
+    def normalize_input_matrix(self, X, inplace=False):
+        if not inplace:
+            X = X.copy()
+        column_centers = np.nanmean(X, axis=0)
+        column_scales = np.nanstd(X, axis=0)
+        column_scales[column_scales == 0] = 1.0
+        X -= column_centers
+        X /= column_scales
+        return X, column_centers, column_scales
+
+    def project_result(
+            self,
+            X,
+            column_centers=None,
+            column_scales=None):
+        """
+        The solution matrices may be scaled or centered away from the range
+        of actual values. Undo these transformations and clip values to
+        fall within any global or column-wise min/max constraints.
+        """
+        if column_scales is not None:
+            X *= column_scales
+
+        if column_centers is not None:
+            X += column_centers
+
+        if self.min_value is not None:
+            X[X < self.min_value] = self.min_value
+        if self.max_value is not None:
+            X[X > self.max_value] = self.max_value
+        return X
+
+    def solve(self, X):
+        raise ValueError("%s.solve not yet implemented!" % (
             self.__class__.__name__,))
+
+    def single_imputation(self, X):
+        X_original, missing_mask = self.prepare_input_data(X)
+        observed_mask = ~missing_mask
+        X = X_original.copy()
+        if self.normalize_columns:
+            X, centers, scales = self.normalize_input_matrix(
+                X,
+                inplace=True)
+        else:
+            centers = scales = None
+        X_filled = self.fill(X, missing_mask, inplace=True)
+        if not isinstance(X_filled, np.ndarray):
+            raise TypeError(
+                "Expected %s.fill() to return NumPy array but got %s" % (
+                    self.__class__.__name__,
+                    type(X_filled)))
+
+        X_result = self.solve(X_filled, missing_mask)
+        if not isinstance(X_result, np.ndarray):
+            raise TypeError(
+                "Expected %s.solve() to return NumPy array but got %s" % (
+                    self.__class__.__name__,
+                    type(X_result)))
+
+        X_result = self.project_result(
+            X=X_result,
+            column_centers=centers,
+            column_scales=scales)
+        X_result[observed_mask] = X_original[observed_mask]
+        return X_result
 
     def multiple_imputations(self, X):
         """

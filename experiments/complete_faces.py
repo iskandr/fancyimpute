@@ -1,3 +1,5 @@
+from os import mkdir
+from os.path import exists, join
 
 import pylab
 from sklearn.datasets import fetch_olivetti_faces
@@ -40,34 +42,26 @@ def load_faces_data(
 
 def save_images(
         images,
+        base_filename,
         imshape=(64, 64),
-        image_indices=[0, 100, 200],
-        base_filename=None):
+        image_indices=[0, 100, 200, 300],
+        dirname="face_images"):
+    if not exists(dirname):
+        mkdir(dirname)
+
+    paths = []
     for i in image_indices:
-        fig, ax = pylab.subplots(1, 1)
+        fig = pylab.gcf()
+        ax = pylab.gca()
         image = images[i, :].copy().reshape(imshape)
         image[np.isnan(image)] = 0
         ax.imshow(image, cmap="gray")
-        if base_filename:
-            filename = base_filename + "_%d" % (i) + ".png"
-            fig.savefig(filename)
+        filename = base_filename + "_%d" % (i) + ".png"
+        path = join(dirname, filename)
+        fig.savefig(path)
+        paths.append(path)
+    return paths
 
-
-def compare_images(
-        original,
-        incomplete,
-        completed,
-        imshape=(64, 64),
-        image_indices=[0, 100, 200, 300],
-        base_filename=None):
-    for i in image_indices:
-        fig, (ax1, ax2, ax3) = pylab.subplots(1, 3)
-        ax1.imshow(original[i].reshape(imshape), cmap="gray")
-        ax2.imshow(incomplete[i].reshape(imshape), cmap="gray")
-        ax3.imshow(completed[i].reshape(imshape), cmap="gray")
-        if base_filename:
-            filename = base_filename + "_%d" % (i) + ".png"
-            fig.savefig(filename)
 
 if __name__ == "__main__":
     original, incomplete = load_faces_data()
@@ -81,24 +75,31 @@ if __name__ == "__main__":
             completed_fill,
             base_filename="SimpleFill_%s" % fill_method)
 
-    for fill_method in ["zero", "mean", "random"]:
-        for shrinkage_value in [5, 20]:
+    for fill_method in ["zero", "mean"]:
+        for shrinkage_value in [50, 100, 150]:
             print("Fill=%s, shrinkage=%d" % (fill_method, shrinkage_value))
             # SoftImpute without rank constraints
             save_images(
                 SoftImpute(
                     init_fill_method=fill_method,
-                    shrinkage_value=shrinkage_value).complete(incomplete),
+                    shrinkage_value=shrinkage_value,
+                    min_value=0,
+                    max_value=1).complete(incomplete),
                 base_filename="SoftImpute_%s_lambda%d" % (
                     fill_method, shrinkage_value))
 
     for rank in [5, 50]:
-        for fill_method in ["zero", "mean", "random"]:
+        for fill_method in ["zero", "mean"]:
             save_images(
-                IterativeSVD(rank=rank, init_fill_method=fill_method).complete(
-                    incomplete),
+                IterativeSVD(
+                    rank=rank,
+                    init_fill_method=fill_method,
+                    min_value=0,
+                    max_value=1,
+                ).complete(incomplete),
                 base_filename="IterativeSVD_%s_rank%d" % (
-                    fill_method, rank))
+                    fill_method,
+                    rank))
 
         save_images(
             MatrixFactorization(rank).complete(incomplete),
@@ -111,4 +112,3 @@ if __name__ == "__main__":
                 output_activation="sigmoid"
             ).complete(incomplete),
             base_filename="nn_rank%d" % rank)
-
