@@ -36,10 +36,10 @@ class MatrixFactorization(Solver):
             self,
             rank=10,
             initializer=np.random.randn,
-            learning_rate=0.01,
-            patience=3,
-            l1_penalty_weight=0.005,
-            l2_penalty_weight=0.005,
+            learning_rate=0.001,
+            patience=5,
+            l1_penalty=0.005,
+            l2_penalty=0.005,
             min_improvement=0.005,
             max_gradient_norm=10,
             optimization_algorithm="adam",
@@ -59,8 +59,8 @@ class MatrixFactorization(Solver):
         self.initializer = initializer
         self.learning_rate = learning_rate
         self.patience = patience
-        self.l1_penalty_weight = l1_penalty_weight
-        self.l2_penalty_weight = l2_penalty_weight
+        self.l1_penalty = l1_penalty
+        self.l2_penalty = l2_penalty
         self.max_gradient_norm = max_gradient_norm
         self.optimization_algorithm = optimization_algorithm
         self.min_improvement = min_improvement
@@ -88,8 +88,8 @@ class MatrixFactorization(Solver):
         mse = err.mean()
         loss = (
             mse +
-            self.l1_penalty_weight * abs(U).mean() +
-            self.l2_penalty_weight * (V * V).mean()
+            self.l1_penalty * abs(U).mean() +
+            self.l2_penalty * (V * V).mean()
         )
         downhill.minimize(
             loss=loss,

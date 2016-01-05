@@ -13,7 +13,6 @@
 from __future__ import absolute_import, print_function, division
 
 import cvxpy
-import numpy as np
 
 from .solver import Solver
 
@@ -27,7 +26,7 @@ class NuclearNormMinimization(Solver):
     def __init__(
             self,
             require_symmetric_solution=False,
-            normalize_columns=True,
+            normalize_columns=False,
             min_value=None,
             max_value=None,
             error_tolerance=0.0,
@@ -43,23 +42,20 @@ class NuclearNormMinimization(Solver):
         self.fast_but_approximate = fast_but_approximate
         self.verbose = verbose
 
-    def _constraints(self, X, S, error_tolerance):
+    def _constraints(self, X, missing_mask, S, error_tolerance):
         """
         Parameters
         ----------
         X : np.array
-            Data matrix with missing values
+            Data matrix with missing values filled in
+
+        missing_mask : np.array
+            Boolean array indicating where missing values were
+
         S : cvxpy.Variable
             Representation of solution variable
         """
-        missing_values = np.isnan(X)
-        self._check_missing_value_mask(missing_values)
-        # copy the array before modifying it
-        X = X.copy()
-        # zero out the NaN values
-        X[missing_values] = 0
-        ok_mask = ~missing_values
-
+        ok_mask = ~missing_mask
         masked_X = cvxpy.mul_elemwise(ok_mask, X)
         masked_S = cvxpy.mul_elemwise(ok_mask, S)
         abs_diff = cvxpy.abs(masked_S - masked_X)
@@ -96,6 +92,7 @@ class NuclearNormMinimization(Solver):
         S, objective = self._create_objective(m, n)
         constraints = self._constraints(
             X=X,
+            missing_mask=missing_mask,
             S=S,
             error_tolerance=self.error_tolerance)
         problem = cvxpy.Problem(objective, constraints)

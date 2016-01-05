@@ -44,7 +44,7 @@ def save_images(
         images,
         base_filename,
         imshape=(64, 64),
-        image_indices=[0, 100, 200, 300],
+        image_indices=[0, 50, 100, 150, 200, 250, 300, 350],
         dirname="face_images"):
     if not exists(dirname):
         mkdir(dirname)
@@ -57,7 +57,10 @@ def save_images(
         image[np.isnan(image)] = 0
         ax.imshow(image, cmap="gray")
         filename = base_filename + "_%d" % (i) + ".png"
-        path = join(dirname, filename)
+        subdir = join(dirname, str(i))
+        if not exists(subdir):
+            mkdir(subdir)
+        path = join(subdir, filename)
         fig.savefig(path)
         paths.append(path)
     return paths

@@ -5,7 +5,11 @@ from common import reconstruction_error
 
 
 def test_matrix_factorization_with_low_rank_random_matrix():
-    solver = MatrixFactorization(k=3, l1_penalty_weight=0, l2_penalty_weight=0)
+    solver = MatrixFactorization(
+        rank=3,
+        l1_penalty=0,
+        l2_penalty=0,
+        normalize_columns=False)
     XY_completed = solver.complete(XY_incomplete)
     _, missing_mae = reconstruction_error(
         XY,

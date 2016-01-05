@@ -35,7 +35,7 @@ except:
 if __name__ == '__main__':
     setup(
         name='fancyimpute',
-        version="0.0.3",
+        version="0.0.4",
         description="Matrix completion and feature imputation algorithms",
         author="Alex Rubinsteyn and Sergey Feldman",
         author_email="alex {dot} rubinsteyn {at} mssm {dot} edu",
@@ -53,7 +53,9 @@ if __name__ == '__main__':
         install_requires=[
             'six',
             'numpy>=1.7',
-            'cvxpy'
+            'scipy',
+            'cvxpy',
+            'scikit-learn',
         ],
         long_description=readme,
         packages=['fancyimpute'],

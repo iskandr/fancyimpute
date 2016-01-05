@@ -144,6 +144,7 @@ class Solver(object):
         of actual values. Undo these transformations and clip values to
         fall within any global or column-wise min/max constraints.
         """
+        X = np.asarray(X)
         if column_scales is not None:
             X *= column_scales
 
