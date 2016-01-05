@@ -15,7 +15,7 @@ import numpy as np
 from sklearn.decomposition import randomized_svd
 
 
-from .common import masked_mae, choose_solution_using_percentiles
+from .common import masked_mae
 from .solver import Solver
 
 
@@ -38,17 +38,50 @@ class SoftImpute(Solver):
     """
     def __init__(
             self,
-            shrinkage_values=[40, 20, 10, 5, 1, 0.5, 0.1, 0.05, 0.01],
+            shrinkage_value=None,
             convergence_threshold=0.001,
-            max_iters=100,
-            rank=None,
+            max_iters=200,
+            max_rank=None,
             n_power_iterations=5,
             init_fill_method="zero",
+            n_imputations=1,
             verbose=True):
-        self.shrinkage_values = shrinkage_values
+        """
+        Parameters
+        ----------
+        shrinkage_value : float
+            Value by which we shrink singular values on each iteration. If
+            omitted then the default value will be the maximum singular
+            value of the initialized matrix (zeros for missing values) divided
+            by 100.
+
+        convergence_threshold : float
+            Minimum ration difference between iterations (as a fraction of
+            the Frobenius norm of the current solution) before stopping.
+
+        max_iters : int
+            Maximum number of SVD iterations
+
+        max_rank : int, optional
+            Perform a truncated SVD on each iteration with this value as its
+            rank.
+
+        init_fill_method : str
+            How to initialize missing values of data matrix, default is
+            to fill them with zeros.
+
+        n_imputations : int
+            Number of imputations to perform. Only makes sense if using a
+            randomized initialization method.
+
+        verbose : bool
+            Print debugging info
+        """
+        Solver.__init__(self, n_imputations=n_imputations)
+        self.shrinkage_value = shrinkage_value
         self.convergence_threshold = convergence_threshold
         self.max_iters = max_iters
-        self.rank = rank
+        self.max_rank = max_rank
         self.n_power_iterations = n_power_iterations
         self.init_fill_method = init_fill_method
         self.verbose = verbose
@@ -62,31 +95,41 @@ class SoftImpute(Solver):
         old_norm = (old_missing_values ** 2).sum()
         return (ssd / old_norm) < self.convergence_threshold
 
-    def _svd_step(self, X, shrinkage_value):
-        if self.rank:
+    def _svd_step(self, X, shrinkage_value, max_rank=None):
+        """
+        Returns reconstructed X from low-rank thresholded SVD and
+        the rank achieved.
+        """
+        if max_rank:
             # if we have a max rank then perform the faster randomized SVD
             (U, s, V) = randomized_svd(
                 X,
-                self.rank,
-                n_iter=self.n_power_iterations)
+                max_rank,
+                n_iter=1)
         else:
             # perform a full rank SVD using ARPACK
             (U, s, V) = np.linalg.svd(
                 X,
                 full_matrices=False,
                 compute_uv=True)
-        s_sparse = np.maximum(s - shrinkage_value, 0)
-        if self.verbose:
-            print(
-                "-- sparsity = %d/%d" % (
-                    (s_sparse > 0).sum(),
-                    len(s_sparse)))
-        return np.dot(U, np.dot(np.diag(s_sparse), V))
+        s_thresh = np.maximum(s - shrinkage_value, 0)
+        rank = (s_thresh > 0).sum()
+        s_thresh = s_thresh[:rank]
+        U_thresh = U[:, :rank]
+        V_thresh = V[:rank, :]
+        S_thresh = np.diag(s_thresh)
+        X_reconstruction = np.dot(U_thresh, np.dot(S_thresh, V_thresh))
+        return X_reconstruction, rank
 
-    def _single_imputation(self, X_init, missing_mask, shrinkage_value):
+    def _solve(self, X_init, missing_mask, shrinkage_value):
         X_filled = X_init.copy()
+        previous_rank = self.max_rank
         for i in range(self.max_iters):
-            X_reconstruction = self._svd_step(X_filled, shrinkage_value)
+            X_reconstruction, rank = self._svd_step(
+                X_filled,
+                shrinkage_value,
+                max_rank=previous_rank)
+            previous_rank = rank
 
             # print error on observed data
             if self.verbose:
@@ -95,9 +138,10 @@ class SoftImpute(Solver):
                     X_pred=X_reconstruction,
                     mask=~missing_mask)
                 print(
-                    "[SoftImpute] Iter %d: observed MAE=%0.6f" % (
+                    "[SoftImpute] Iter %d: observed MAE=%0.6f rank=%d" % (
                         i + 1,
-                        mae))
+                        mae,
+                        rank))
 
             if self._converged(
                     X_old=X_filled,
@@ -111,30 +155,29 @@ class SoftImpute(Solver):
                 shrinkage_value))
         return X_filled
 
-    def multiple_imputations(self, X):
+    def single_imputation(self, X):
         X_filled, missing_mask = self.prepare_data(
             X,
             inplace=False,
             fill_method=self.init_fill_method)
-
-        results = []
-        for shrinkage_value in reversed(sorted(self.shrinkage_values)):
-            # traverse shrinkage values in decrease order
-            # and use last solution as start for the next one
-            X_result = self._single_imputation(
-                X_filled,
-                missing_mask,
-                shrinkage_value)
-            results.append(X_result)
-        return results
-
-    def complete(self, X):
-        solutions = self.multiple_imputations(X)
-        if len(solutions) == 1:
-            return solutions[0]
+        if self.shrinkage_value:
+            shrinkage_value = self.shrinkage_value
         else:
-            return choose_solution_using_percentiles(
-                X,
-                solutions,
-                parameters=self.shrinkage_values,
-                verbose=self.verbose)
+            # quick decomposition of X_filled into rank-1 SVD
+            _, s, _ = randomized_svd(
+                X_filled,
+                1,
+                n_iter=5)
+            max_singular_value = s[0]
+            # totally hackish heuristic: keep only components
+            # with at least 1/100th the max singular value
+            shrinkage_value = max_singular_value / 100
+            if self.verbose:
+                print("Initializing lambda=%f (lambda_max=%f)" % (
+                    shrinkage_value,
+                    max_singular_value))
+
+        return self._solve(
+            X_init=X_filled,
+            missing_mask=missing_mask,
+            shrinkage_value=shrinkage_value)

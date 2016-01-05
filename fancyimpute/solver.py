@@ -16,6 +16,8 @@ from .common import generate_random_column_samples
 
 
 class Solver(object):
+    def __init__(self, n_imputations=1):
+        self.n_imputations = n_imputations
 
     def _check_input(self, X):
         if len(X.shape) != 2:
@@ -52,7 +54,7 @@ class Solver(object):
             "mean": fill with column means
             "median" : fill with column medians
             "min": fill with min value per column
-            "random": fill with gaussian noise according to mean/std of column
+            "random": fill with gaussian samples according to mean/std of column
 
         inplace : bool
             Modify matrix or fill a copy
@@ -112,9 +114,19 @@ class Solver(object):
             self.__class__.__name__,))
 
     def multiple_imputations(self, X):
-        raise ValueError("%s.multiple_imputations not yet implemented!" % (
-            self.__class__.__name__,))
+        """
+        Generate multiple imputations of the same incomplete matrix
+        """
+        return [self.single_imputation(X) for _ in range(self.n_imputations)]
 
     def complete(self, X):
-        raise ValueError("%s.complete not yet implemented!" % (
-            self.__class__.__name__,))
+        """
+        Expects 2d float matrix with NaN entries signifying missing values
+
+        Returns completed matrix without any NaNs.
+        """
+        imputations = self.multiple_imputations(X)
+        if len(imputations) == 1:
+            return imputations[0]
+        else:
+            return np.mean(imputations, axis=0)

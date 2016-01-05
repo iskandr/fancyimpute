@@ -74,30 +74,41 @@ if __name__ == "__main__":
     save_images(original, base_filename="original")
     save_images(incomplete, base_filename="incomplete")
 
-    # SoftImpute without rank constraints
-    save_images(
-        SoftImpute().complete(incomplete),
-        base_filename="SoftImpute")
-
-    for rank in [5, 50]:
-        for solver_class in [IterativeSVD, SoftImpute, MatrixFactorization]:
-            solver = solver_class(rank=rank)
-            completed = solver.complete(incomplete)
-            save_images(
-                completed,
-                base_filename="%s_rank%d" % (solver_class.__name__, rank))
-        nn = AutoEncoder(
-            hidden_layer_sizes=[1000, rank],
-            hidden_activation="tanh",
-            output_activation="sigmoid")
-        completed_nn = nn.complete(incomplete)
-        save_images(
-            completed_nn,
-            base_filename="nn_rank%d" % rank)
-
     for fill_method in ["mean", "median"]:
         filler = SimpleFill(fill_method=fill_method)
         completed_fill = filler.complete(incomplete)
         save_images(
             completed_fill,
-            base_filename="simple_fill_%s" % fill_method)
+            base_filename="SimpleFill_%s" % fill_method)
+
+    for fill_method in ["zero", "mean", "random"]:
+        for shrinkage_value in [5, 20]:
+            print("Fill=%s, shrinkage=%d" % (fill_method, shrinkage_value))
+            # SoftImpute without rank constraints
+            save_images(
+                SoftImpute(
+                    init_fill_method=fill_method,
+                    shrinkage_value=shrinkage_value).complete(incomplete),
+                base_filename="SoftImpute_%s_lambda%d" % (
+                    fill_method, shrinkage_value))
+
+    for rank in [5, 50]:
+        for fill_method in ["zero", "mean", "random"]:
+            save_images(
+                IterativeSVD(rank=rank, init_fill_method=fill_method).complete(
+                    incomplete),
+                base_filename="IterativeSVD_%s_rank%d" % (
+                    fill_method, rank))
+
+        save_images(
+            MatrixFactorization(rank).complete(incomplete),
+            base_filename="MatrixFactorization_rank%d" % rank)
+
+        save_images(
+            AutoEncoder(
+                hidden_layer_sizes=[500, rank],
+                hidden_activation="tanh",
+                output_activation="sigmoid"
+            ).complete(incomplete),
+            base_filename="nn_rank%d" % rank)
+

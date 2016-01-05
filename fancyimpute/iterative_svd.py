@@ -23,7 +23,7 @@ class IterativeSVD(Solver):
             rank,
             max_iters=100,
             n_imputations=1,
-            init_fill_method="random",
+            init_fill_method="zero",
             min_difference_between_iters=0.001,
             min_fraction_improvement=0.999,
             patience=5,
@@ -76,10 +76,3 @@ class IterativeSVD(Solver):
             else:
                 iters_since_best += 1
         return best_solution
-
-    def multiple_imputations(self, X):
-        return [self.single_imputation(X) for _ in range(self.n_imputations)]
-
-    def complete(self, X):
-        imputations = self.multiple_imputations(X)
-        return np.mean(imputations, axis=0)

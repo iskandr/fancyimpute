@@ -43,7 +43,9 @@ class MatrixFactorization(Solver):
             min_improvement=0.005,
             max_gradient_norm=10,
             optimization_algorithm="adam",
+            n_imputations=1,
             verbose=True):
+        Solver.__init__(self, n_imputations=n_imputations)
         self.rank = rank
         self.initializer = initializer
         self.learning_rate = learning_rate
@@ -58,12 +60,7 @@ class MatrixFactorization(Solver):
         if self.verbose:
             climate.enable_default_logging()
 
-    def complete(self, X, verbose=True):
-        """
-        Expects 2d float matrix with NaN entries signifying missing values
-
-        Returns completed matrix without any NaNs.
-        """
+    def single_imputation(self, X):
         X, missing_mask = self.prepare_data(X, inplace=False)
 
         # replace NaN's with 0
@@ -96,11 +93,9 @@ class MatrixFactorization(Solver):
             algo=self.optimization_algorithm,
             batch_size=n_samples,
             min_improvement=self.min_improvement,
-            max_gradient_norm=self.max_gradient_norm,  # Prevent gradient explosion!
+            max_gradient_norm=self.max_gradient_norm,
             learning_rate=self.learning_rate,
-            monitors=(('err', err.mean()),    # Monitor during optimization.
-                      ('|u|<0.1', (abs(U) < 0.1).mean()),
-                      ('|v|<0.1', (abs(U) < 0.1).mean())),
+            monitors=[("error", err.mean())],
             monitor_gradients=self.verbose)
 
         U_value = U.get_value()

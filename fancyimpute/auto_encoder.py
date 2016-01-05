@@ -44,7 +44,9 @@ class AutoEncoder(Solver):
             patience_epochs=10,
             min_improvement=0.995,
             max_training_epochs=None,
+            init_fill_method="zero",
             verbose=True):
+        Solver.__init__(self, n_imputations=n_imputations)
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
         self.hidden_layer_sizes = hidden_layer_sizes
@@ -54,11 +56,11 @@ class AutoEncoder(Solver):
         self.l1_penalty = l1_penalty
         self.l2_penalty = l2_penalty
         self.hidden_layer_sizes = hidden_layer_sizes
-        self.n_imputations = n_imputations
         self.hallucination_weight = hallucination_weight
         self.patience_epochs = patience_epochs
         self.min_improvement = min_improvement
         self.max_training_epochs = max_training_epochs
+        self.init_fill_method
         self.verbose = verbose
 
         # network and its input size get set on first call to complete()
@@ -102,7 +104,10 @@ class AutoEncoder(Solver):
             self,
             X,
             X_complete=None):
-        X, missing_mask = self.prepare_data(X)
+        X, missing_mask = self.prepare_data(
+            X, inplace=False,
+            fill_method=self.init_fill_method)
+
         n_samples, n_features = X.shape
 
         if self.network_input_size != n_features:
@@ -192,18 +197,3 @@ class AutoEncoder(Solver):
                 X[missing_mask] += (
                     self.hallucination_weight * X_pred[missing_mask])
         return recent_predictions
-
-    def complete(
-            self,
-            X,
-            X_complete=None):
-        """
-        Expects 2d float matrix with NaN entries signifying missing values
-
-        Returns completed matrix without any NaNs.
-        """
-
-        recent_predictions = self.multiple_imputations(
-            X=X,
-            X_complete=X_complete)
-        return np.mean(recent_predictions, axis=0)
