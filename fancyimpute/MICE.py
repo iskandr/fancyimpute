@@ -15,9 +15,10 @@ from __future__ import absolute_import, print_function, division
 import numpy as np
 
 from .bayesian_ridge_regression import BayesianRidgeRegression
+from .solver import Solver
 
 
-class MICE():
+class MICE(Solver):
     """
     Basic implementation of MICE from R.
     This version assumes all of the columns are continuous,

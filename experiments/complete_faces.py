@@ -78,8 +78,8 @@ if __name__ == "__main__":
             completed_fill,
             base_filename="SimpleFill_%s" % fill_method)
 
-    for fill_method in ["zero", "mean"]:
-        for shrinkage_value in [50, 100, 150]:
+    for fill_method in ["zero"]:
+        for shrinkage_value in [10, 20, 40, 80]:
             print("Fill=%s, shrinkage=%d" % (fill_method, shrinkage_value))
             # SoftImpute without rank constraints
             save_images(
@@ -92,7 +92,7 @@ if __name__ == "__main__":
                     fill_method, shrinkage_value))
 
     for rank in [5, 50]:
-        for fill_method in ["zero", "mean"]:
+        for fill_method in ["zero"]:
             save_images(
                 IterativeSVD(
                     rank=rank,
@@ -103,15 +103,27 @@ if __name__ == "__main__":
                 base_filename="IterativeSVD_%s_rank%d" % (
                     fill_method,
                     rank))
+        for l1_fraction in [10, 100]:
+            for l2_fraction in [10, 100]:
+                save_images(
+                    MatrixFactorization(
+                        rank,
+                        l1_penalty=1.0 / l1_fraction,
+                        l2_penalty=1.0 / l2_fraction,
+                        min_value=0,
+                        max_value=1).complete(incomplete),
+                    base_filename="MatrixFactorization_rank%d_l1_%d_l2_%d" % (
+                        rank,
+                        l1_fraction,
+                        l2_fraction))
 
-        save_images(
-            MatrixFactorization(rank).complete(incomplete),
-            base_filename="MatrixFactorization_rank%d" % rank)
-
+    for rank in [5, 50]:
         save_images(
             AutoEncoder(
-                hidden_layer_sizes=[500, rank],
+                hidden_layer_sizes=[100, rank],
                 hidden_activation="tanh",
-                output_activation="sigmoid"
+                output_activation="sigmoid",
+                min_value=0,
+                max_value=1,
             ).complete(incomplete),
             base_filename="nn_rank%d" % rank)

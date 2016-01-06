@@ -52,8 +52,8 @@ class IterativeSVD(Solver):
         best_solution = X
         iters_since_best = 0
         X_filled = X
-        tsvd = TruncatedSVD(self.rank, algorithm=self.svd_algorithm)
         for i in range(self.max_iters):
+            tsvd = TruncatedSVD(self.rank, algorithm=self.svd_algorithm)
             X_reduced = tsvd.fit_transform(X_filled)
             X_reconstructed = tsvd.inverse_transform(X_reduced)
             mae = masked_mae(

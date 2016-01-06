@@ -89,8 +89,7 @@ class MatrixFactorization(Solver):
         loss = (
             mse +
             self.l1_penalty * abs(U).mean() +
-            self.l2_penalty * (V * V).mean()
-        )
+            self.l2_penalty * (V * V).mean())
         downhill.minimize(
             loss=loss,
             train=[X],

@@ -124,6 +124,42 @@ class Solver(object):
         self._check_missing_value_mask(missing_mask)
         return X, missing_mask
 
+    def biscale(self, X):
+        """
+        TODO: Implement iterative estimation of row and column centering/scaling
+        parameters using the algorithm from page 31 of:
+        Matrix Completion and Low-Rank SVD via Fast Alternating Least Squares
+
+        row_center[i] =
+            sum{j in observed[i, :]}{
+                (1 / column_scale[j]) * (X[i, j] - column_center[j])
+            }
+            ------------------------------------------------------------
+            sum{j in observed[i, :]}{1 / column_scale[j]}
+
+        column_center[j] =
+            sum{i in observed[:, j]}{
+                (1 / row_scale[i]) * (X[i, j]) - row_center[i])
+            }
+            ------------------------------------------------------------
+            sum{i in observed[:, j]}{1 / row_scale[i]}
+
+        row_scale[i]**2 =
+            mean{j in observed[i, :]}{
+                (X[i, j] - row_center[i] - column_center[j]) ** 2
+                --------------------------------------------------
+                            column_scale[j] ** 2
+            }
+
+        column_scale[j] ** 2 =
+            mean{i in observed[:, j]}{
+                (X[i, j] - row_center[i] - column_center[j]) ** 2
+                -------------------------------------------------
+                            row_scale[i] ** 2
+            }
+        """
+        raise ValueError("Bi-scaling not yet implemented")
+
     def normalize_input_matrix(self, X, inplace=False):
         if not inplace:
             X = X.copy()
@@ -138,18 +174,51 @@ class Solver(object):
             self,
             X,
             column_centers=None,
-            column_scales=None):
+            column_scales=None,
+            row_centers=None,
+            row_scales=None):
         """
         The solution matrices may be scaled or centered away from the range
         of actual values. Undo these transformations and clip values to
         fall within any global or column-wise min/max constraints.
         """
         X = np.asarray(X)
+        n_rows, n_cols = X.shape
         if column_scales is not None:
+            if len(column_scales) != n_cols:
+                raise ValueError(
+                    ("Expected vector of column scales to be %d elements, "
+                     "got %d instead") % (
+                        n_cols,
+                        len(column_scales)))
+            # broadcast the column scales across each
             X *= column_scales
+        if row_scales is not None:
+            if len(row_scales) != n_rows:
+                raise ValueError(
+                    ("Expected vector of row scales to have %d elements, "
+                     "got %d instead") % (
+                        n_rows,
+                        len(row_scales)))
+            X *= row_scales.reshape((n_rows, 1))
 
         if column_centers is not None:
+            if len(column_centers) != n_cols:
+                raise ValueError(
+                    ("Expected vector of column centers to have %d elements, "
+                     "got %d instead") % (
+                        n_cols,
+                        len(column_centers)))
             X += column_centers
+
+        if row_centers is not None:
+            if len(row_centers) != n_rows:
+                raise ValueError(
+                    ("Expected vector of row centers to have %d elements, "
+                     "got %d instead") % (
+                        n_rows,
+                        len(row_centers)))
+            X += row_centers.reshape((n_rows, 1))
 
         if self.min_value is not None:
             X[X < self.min_value] = self.min_value
@@ -157,7 +226,11 @@ class Solver(object):
             X[X > self.max_value] = self.max_value
         return X
 
-    def solve(self, X):
+    def solve(self, X, missing_mask):
+        """
+        Given an initialized matrix X and a mask of where its missing values
+        had been, return a completion of X.
+        """
         raise ValueError("%s.solve not yet implemented!" % (
             self.__class__.__name__,))
 
