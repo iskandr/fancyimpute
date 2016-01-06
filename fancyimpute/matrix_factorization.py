@@ -41,7 +41,7 @@ class MatrixFactorization(Solver):
             l1_penalty=0.005,
             l2_penalty=0.005,
             min_improvement=0.005,
-            max_gradient_norm=10,
+            max_gradient_norm=5,
             optimization_algorithm="adam",
             n_imputations=1,
             normalize_columns=True,

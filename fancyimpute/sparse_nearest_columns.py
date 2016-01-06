@@ -112,4 +112,3 @@ class SparseNearestColumns(object):
         similarities, overlaps, weights = self.jacard_similarity_columns(
             nested_dictionaries)
         raise ValueError("Not yet implemented!")
-

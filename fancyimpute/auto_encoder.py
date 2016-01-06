@@ -39,14 +39,16 @@ class AutoEncoder(Solver):
             batch_size=32,
             l1_penalty=0,
             l2_penalty=0,
-            recurrent_weight=0.1,
-            output_history_size=10,
-            patience_epochs=None,
+            recurrent_weight=0.5,
+            n_burn_in_epochs=20,
+            missing_input_noise_weight=0,
+            output_history_size=25,
+            patience_epochs=20,
             min_improvement=0.995,
             max_training_epochs=None,
             init_fill_method="zero",
             n_imputations=1,
-            normalize_columns=True,
+            normalize_columns=False,
             min_value=None,
             max_value=None,
             verbose=True):
@@ -68,6 +70,8 @@ class AutoEncoder(Solver):
         self.l2_penalty = l2_penalty
         self.hidden_layer_sizes = hidden_layer_sizes
         self.recurrent_weight = recurrent_weight
+        self.n_burn_in_epochs = n_burn_in_epochs
+        self.missing_input_noise_weight = missing_input_noise_weight
         self.output_history_size = output_history_size
         self.patience_epochs = patience_epochs
         self.min_improvement = min_improvement
@@ -89,15 +93,14 @@ class AutoEncoder(Solver):
             l2_penalty=self.l2_penalty,
             optimizer=self.optimizer)
 
-    def _train_epoch(self, X, missing_mask, X_with_missing_mask=None):
+    def _train_epoch(self, X, missing_mask):
         """
         Trains the network for one pass over the data,
         returns the network's predictions on the training data.
         """
         n_samples = len(X)
         n_batches = int(np.ceil(n_samples / self.batch_size))
-        if X_with_missing_mask is None:
-            X_with_missing_mask = np.hstack([X, missing_mask])
+        X_with_missing_mask = np.hstack([X, missing_mask])
         indices = np.arange(n_samples)
         np.random.shuffle(indices)
         X_shuffled = X_with_missing_mask[indices]
@@ -119,15 +122,16 @@ class AutoEncoder(Solver):
             max_training_epochs = int(
                 np.ceil(0.5 * 10 ** 6 / n_updates_per_epoch))
             if self.verbose:
-                print("Max Epochs: %d" % max_training_epochs)
+                print("[AutoEncoder] Max Epochs: %d" % max_training_epochs)
         else:
             max_training_epochs = self.max_training_epochs
 
         if not self.patience_epochs:
             patience_epochs = int(np.ceil(max_training_epochs / 100))
             if self.verbose:
-                print("Default patience (# epochs before improvement): %d" % (
-                    patience_epochs,))
+                print(
+                    ("[AutoEncoder] Default patience"
+                     "(# epochs before improvement): %d") % (patience_epochs,))
         else:
             patience_epochs = self.patience_epochs
 
@@ -162,7 +166,11 @@ class AutoEncoder(Solver):
                 X_true=X,
                 X_pred=X_pred,
                 mask=observed_mask)
-
+            if self.verbose:
+                print("[AutoEncoder] Epoch %d/%d Observed MAE=%f" % (
+                    epoch + 1,
+                    max_training_epochs,
+                    observed_mae))
             if epoch == 0:
                 best_error_seen = observed_mae
                 recent_errors = [observed_mae]
@@ -183,9 +191,15 @@ class AutoEncoder(Solver):
                             best_error_seen))
                 break
 
-            if self.recurrent_weight:
-                old_weight = 1.0 - self.recurrent_weight
+            # start updating the inputs with imputed values after
+            # pre-specified number of epochs exceeded
+            if epoch >= self.n_burn_in_epochs:
+                old_weight = (1.0 - self.recurrent_weight)
                 X[missing_mask] = old_weight * X[missing_mask]
-                X[missing_mask] += (
-                    self.recurrent_weight * X_pred[missing_mask])
+                pred_missing = X_pred[missing_mask]
+                X[missing_mask] += self.recurrent_weight * pred_missing
+                if self.missing_input_noise_weight:
+                    noise = np.random.randn(*pred_missing.shape)
+                    X[missing_mask] += (
+                        self.missing_input_noise_weight * noise)
         return np.mean(recent_predictions, axis=0)

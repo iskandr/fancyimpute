@@ -1,5 +1,6 @@
 from os import mkdir
 from os.path import exists, join
+from collections import defaultdict
 
 import pylab
 from sklearn.datasets import fetch_olivetti_faces
@@ -7,123 +8,234 @@ import numpy as np
 
 from fancyimpute import (
     AutoEncoder,
-    MICE,
+    # MICE,
     MatrixFactorization,
-    NuclearNormMinimization,
+    # NuclearNormMinimization,
     SimpleFill,
     IterativeSVD,
     SoftImpute,
 )
+from fancyimpute.common import masked_mae, masked_mse
 
 
-def load_faces_data(
-        missing_square_size=32,
+def remove_pixels(
+        full_images,
         width=64,
         height=64,
-        fetch_data_fn=fetch_olivetti_faces,
+        missing_square_size=32,
         random_seed=0):
     np.random.seed(random_seed)
-    dataset = fetch_data_fn()
-    full_faces_matrix = dataset.data.astype(np.float32)
     incomplete_faces = []
-    n_faces, n_pixels = full_faces_matrix.shape
+    n_faces, n_pixels = full_images.shape
     assert n_pixels == width * height
     for i in range(n_faces):
-        image = full_faces_matrix[i].reshape((height, width)).copy()
-        start_x = np.random.randint(low=0, high=height - missing_square_size + 1)
-        start_y = np.random.randint(low=0, high=width - missing_square_size + 1)
+        image = full_images[i].reshape((height, width)).copy()
+        start_x = np.random.randint(
+            low=0,
+            high=height - missing_square_size + 1)
+        start_y = np.random.randint(
+            low=0,
+            high=width - missing_square_size + 1)
         image[
             start_x:start_x + missing_square_size,
             start_y:start_y + missing_square_size] = np.nan
         incomplete_faces.append(image.reshape((n_pixels,)))
     incomplete_faces_matrix = np.array(incomplete_faces, dtype=np.float32)
-    return full_faces_matrix, incomplete_faces_matrix
+    return incomplete_faces_matrix
 
 
-def save_images(
-        images,
-        base_filename,
-        imshape=(64, 64),
-        image_indices=[0, 50, 100, 150, 200, 250, 300, 350],
-        dirname="face_images"):
-    if not exists(dirname):
-        mkdir(dirname)
+class ResultsTable(object):
 
-    paths = []
-    for i in image_indices:
-        fig = pylab.gcf()
-        ax = pylab.gca()
-        image = images[i, :].copy().reshape(imshape)
-        image[np.isnan(image)] = 0
-        ax.imshow(image, cmap="gray")
-        filename = base_filename + "_%d" % (i) + ".png"
-        subdir = join(dirname, str(i))
-        if not exists(subdir):
-            mkdir(subdir)
-        path = join(subdir, filename)
-        fig.savefig(path)
-        paths.append(path)
-    return paths
+    def __init__(
+            self,
+            images,
+            width=64,
+            height=64,
+            missing_square_size=32,
+            saved_image_stride=75,
+            dirname="face_images"):
+        self.original = self.normalize(images)
+        self.width = width
+        self.height = height
+        assert images.shape[1] == width * height
+        self.incomplete = remove_pixels(
+            images,
+            width=width,
+            height=height,
+            missing_square_size=missing_square_size)
+        self.missing_mask = np.isnan(self.incomplete)
+        self.n_images = len(original)
+        self.saved_image_indices = list(
+            range(0, self.n_images, saved_image_stride))
+        self.saved_images = defaultdict(dict)
+        self.dirname = dirname
+        self.mse_dict = {}
+        self.mae_dict = {}
 
+    def normalize(self, images):
+        """
+        Rescale the range of values in images to be between [0, 1]
+        """
+        images = np.asarray(images).copy()
+        images = images.astype("float32")
+        images -= images.min()
+        images /= images.max()
+        return images
+
+    def ensure_dir(self, dirname):
+        if not exists(dirname):
+            print("Creating directory: %s" % dirname)
+            mkdir(dirname)
+
+    def save_images(self, images, base_filename):
+        imshape = (self.width, self.height)
+        self.ensure_dir(self.dirname)
+        for i in self.saved_image_indices:
+            fig = pylab.gcf()
+            ax = pylab.gca()
+            image = images[i, :].copy().reshape(imshape)
+            image[np.isnan(image)] = 0
+            ax.imshow(image, cmap="gray", vmin=0, vmax=1)
+            filename = base_filename + "_%d" % (i) + ".png"
+            subdir = join(self.dirname, str(i))
+            self.ensure_dir(subdir)
+            path = join(subdir, filename)
+            fig.savefig(path)
+            self.saved_images[i][base_filename] = path
+
+    def add_entry(self, solver, name):
+        print("Running %s" % name)
+        completed = solver.complete(self.incomplete)
+        mae = masked_mae(
+            X_true=self.original,
+            X_pred=completed,
+            mask=self.missing_mask)
+        mse = masked_mse(
+            X_true=self.original,
+            X_pred=completed,
+            mask=self.missing_mask)
+        print("==> %s: MSE=%0.4f MAE=%0.4f" % (name, mse, mae))
+        self.mse_dict[name] = mse
+        self.mae_dict[name] = mae
+        self.save_images(completed, base_filename=name)
+
+    def sorted_errors(self):
+        """
+        Generator for (rank, name, MSE, MAE) sorted by increasing MAE
+        """
+        for i, (name, mae) in enumerate(
+                sorted(self.mae_dict.items(), key=lambda x: x[1])):
+            yield(i + 1, name, self.mse_dict[name], self.mae_dict[name],)
+
+    def print_sorted_errors(self):
+        for (rank, name, mse, mae) in self.sorted_errors():
+            print("%d) %s: MSE=%0.4f MAE=%0.4f" % (
+                rank,
+                name,
+                mse,
+                mae))
+
+    def save_html_table(self, filename="results_table.html"):
+        html = """
+            <table>
+            <th>
+                <td>Rank</td>
+                <td>Name</td>
+                <td>Mean Squared Error</td>
+                <td>Mean Absolute Error</td>
+            </th>
+        """
+        for (rank, name, mse, mae) in self.sorted_errors():
+            html += """
+            <tr>
+                <td>%d</td>
+                <td>%s</td>
+                <td>%0.4f</td>
+                <td>%0.4f</td>
+            </tr>
+            """ % (rank, name, mse, mae)
+        html += "</table>"
+        self.ensure_dir(self.dirname)
+        path = join(self.dirname, filename)
+        with open(path, "w") as f:
+            f.write(html)
+        return html
 
 if __name__ == "__main__":
-    original, incomplete = load_faces_data()
-    save_images(original, base_filename="original")
-    save_images(incomplete, base_filename="incomplete")
+    dataset = fetch_olivetti_faces()
+    original = dataset.data
+
+    table = ResultsTable(original)
 
     for fill_method in ["mean", "median"]:
-        filler = SimpleFill(fill_method=fill_method)
-        completed_fill = filler.complete(incomplete)
-        save_images(
-            completed_fill,
-            base_filename="SimpleFill_%s" % fill_method)
+        table.add_entry(
+            solver=SimpleFill(fill_method=fill_method),
+            name="SimpleFill_%s" % fill_method)
 
-    for fill_method in ["zero"]:
-        for shrinkage_value in [10, 20, 40, 80]:
-            print("Fill=%s, shrinkage=%d" % (fill_method, shrinkage_value))
+    for rank in [5, 50]:
+        for recurrent in [True, False]:
+            for hidden_activation in ["tanh"]:
+                print(
+                    ("AutoEncoder activation =%s, rank = %d, "
+                     "recurrent = %s") % (
+                        hidden_activation,
+                        rank,
+                        recurrent))
+                table.add_entry(
+                    solver=AutoEncoder(
+                        optimizer="adam",
+                        hidden_layer_sizes=[200, rank],
+                        hidden_activation=hidden_activation,
+                        output_activation="linear",
+                        normalize_columns=True,
+                        patience_epochs=20,
+                        recurrent_weight=(0.5 if recurrent else 0),
+                        missing_input_noise_weight=0,
+                        min_value=0,
+                        max_value=1,
+                    ),
+                    name="AutoEncoder_%s_rank%d_recurrent_%s" % (
+                        hidden_activation,
+                        rank,
+                        recurrent))
+
+    for fill_method in ["zero", "mean"]:
+        for shrinkage_value in [25, 50, 100]:
             # SoftImpute without rank constraints
-            save_images(
-                SoftImpute(
+            table.add_entry(
+                solver=SoftImpute(
                     init_fill_method=fill_method,
                     shrinkage_value=shrinkage_value,
+                    normalize_columns=True,
                     min_value=0,
-                    max_value=1).complete(incomplete),
-                base_filename="SoftImpute_%s_lambda%d" % (
-                    fill_method, shrinkage_value))
+                    max_value=1),
+                name="SoftImpute_%s_lambda%d" % (fill_method, shrinkage_value))
 
     for rank in [5, 50]:
-        for fill_method in ["zero"]:
-            save_images(
-                IterativeSVD(
+        for fill_method in ["zero", "mean"]:
+            table.add_entry(
+                solver=IterativeSVD(
                     rank=rank,
                     init_fill_method=fill_method,
+                    normalize_columns=True,
                     min_value=0,
                     max_value=1,
-                ).complete(incomplete),
-                base_filename="IterativeSVD_%s_rank%d" % (
-                    fill_method,
-                    rank))
-        for l1_fraction in [10, 100]:
-            for l2_fraction in [10, 100]:
-                save_images(
-                    MatrixFactorization(
+                ),
+                name="IterativeSVD_%s_rank%d" % (fill_method, rank))
+        for l1_inv_weight in [10, 100]:
+            for l2_inv_weight in [10, 100]:
+                table.add_entry(
+                    solver=MatrixFactorization(
                         rank,
-                        l1_penalty=1.0 / l1_fraction,
-                        l2_penalty=1.0 / l2_fraction,
+                        l1_penalty=1.0 / l1_inv_weight,
+                        l2_penalty=1.0 / l2_inv_weight,
+                        normalize_columns=True,
                         min_value=0,
-                        max_value=1).complete(incomplete),
-                    base_filename="MatrixFactorization_rank%d_l1_%d_l2_%d" % (
+                        max_value=1),
+                    name="MatrixFactorization_rank%d_l1_%d_l2_%d" % (
                         rank,
-                        l1_fraction,
-                        l2_fraction))
+                        l1_inv_weight,
+                        l2_inv_weight))
 
-    for rank in [5, 50]:
-        save_images(
-            AutoEncoder(
-                hidden_layer_sizes=[100, rank],
-                hidden_activation="tanh",
-                output_activation="sigmoid",
-                min_value=0,
-                max_value=1,
-            ).complete(incomplete),
-            base_filename="nn_rank%d" % rank)
+    table.save_html_table()
+    table.print_sorted_errors()
