@@ -34,7 +34,7 @@ class MICE(Solver):
             impute_type='row',
             model=BayesianRidgeRegression(lambda_reg=1e-5),
             add_ones=True,
-            approximate_but_fast_mode=True):
+            approximate_but_fast_mode=False):
         """
         Parameters
         ----------
