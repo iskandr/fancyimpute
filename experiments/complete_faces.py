@@ -72,6 +72,9 @@ class ResultsTable(object):
         self.mse_dict = {}
         self.mae_dict = {}
 
+        self.save_images(self.original, "original")
+        self.save_images(self.incomplete, "incomplete")
+
     def normalize(self, images):
         """
         Rescale the range of values in images to be between [0, 1]
@@ -91,16 +94,20 @@ class ResultsTable(object):
         imshape = (self.width, self.height)
         self.ensure_dir(self.dirname)
         for i in self.saved_image_indices:
-            fig = pylab.gcf()
-            ax = pylab.gca()
             image = images[i, :].copy().reshape(imshape)
             image[np.isnan(image)] = 0
-            ax.imshow(image, cmap="gray", vmin=0, vmax=1)
+            figure = pylab.gcf()
+            axes = pylab.gca()
+            axes.imshow(image, vmin=0, vmax=1, cmap="gray")
+            axes.get_xaxis().set_visible(False)
+            axes.get_yaxis().set_visible(False)
             filename = base_filename + "_%d" % (i) + ".png"
             subdir = join(self.dirname, str(i))
             self.ensure_dir(subdir)
             path = join(subdir, filename)
-            fig.savefig(path)
+            figure.savefig(
+                path,
+                bbox_inches='tight')
             self.saved_images[i][base_filename] = path
 
     def add_entry(self, solver, name):
@@ -167,75 +174,55 @@ if __name__ == "__main__":
 
     table = ResultsTable(original)
 
-    for fill_method in ["mean", "median"]:
+    for fill_method in ["mean"]:
         table.add_entry(
             solver=SimpleFill(fill_method=fill_method),
             name="SimpleFill_%s" % fill_method)
 
-    for rank in [5, 50]:
-        for recurrent in [True, False]:
-            for hidden_activation in ["tanh"]:
-                print(
-                    ("AutoEncoder activation =%s, rank = %d, "
-                     "recurrent = %s") % (
-                        hidden_activation,
-                        rank,
-                        recurrent))
-                table.add_entry(
-                    solver=AutoEncoder(
-                        optimizer="adam",
-                        hidden_layer_sizes=[200, rank],
-                        hidden_activation=hidden_activation,
-                        output_activation="linear",
-                        normalize_columns=True,
-                        patience_epochs=20,
-                        recurrent_weight=(0.5 if recurrent else 0),
-                        missing_input_noise_weight=0,
-                        min_value=0,
-                        max_value=1,
-                    ),
-                    name="AutoEncoder_%s_rank%d_recurrent_%s" % (
-                        hidden_activation,
-                        rank,
-                        recurrent))
+    normalize_columns = True
 
-    for fill_method in ["zero", "mean"]:
-        for shrinkage_value in [25, 50, 100]:
-            # SoftImpute without rank constraints
-            table.add_entry(
-                solver=SoftImpute(
-                    init_fill_method=fill_method,
-                    shrinkage_value=shrinkage_value,
-                    normalize_columns=True,
-                    min_value=0,
-                    max_value=1),
-                name="SoftImpute_%s_lambda%d" % (fill_method, shrinkage_value))
+    for shrinkage_value in [25, 50, 100]:
+        # SoftImpute without rank constraints
+        table.add_entry(
+            solver=SoftImpute(
+                shrinkage_value=shrinkage_value,
+                normalize_columns=normalize_columns,
+                min_value=0,
+                max_value=1),
+            name="SoftImpute_lambda%d" % (shrinkage_value,))
 
     for rank in [5, 50]:
-        for fill_method in ["zero", "mean"]:
-            table.add_entry(
-                solver=IterativeSVD(
-                    rank=rank,
-                    init_fill_method=fill_method,
-                    normalize_columns=True,
-                    min_value=0,
-                    max_value=1,
-                ),
-                name="IterativeSVD_%s_rank%d" % (fill_method, rank))
-        for l1_inv_weight in [10, 100]:
-            for l2_inv_weight in [10, 100]:
-                table.add_entry(
-                    solver=MatrixFactorization(
-                        rank,
-                        l1_penalty=1.0 / l1_inv_weight,
-                        l2_penalty=1.0 / l2_inv_weight,
-                        normalize_columns=True,
-                        min_value=0,
-                        max_value=1),
-                    name="MatrixFactorization_rank%d_l1_%d_l2_%d" % (
-                        rank,
-                        l1_inv_weight,
-                        l2_inv_weight))
-
+        print("AutoEncoder rank = %d" % rank)
+        table.add_entry(
+            solver=AutoEncoder(
+                optimizer="adam",
+                hidden_layer_sizes=[200, rank],
+                hidden_activation="tanh",
+                output_activation="linear",
+                normalize_columns=normalize_columns,
+                patience_epochs=50,
+                missing_input_noise_weight=0,
+                min_value=0,
+                max_value=1,
+            ),
+            name="AutoEncoder_rank%d" % (rank,))
+        table.add_entry(
+            solver=IterativeSVD(
+                rank=rank,
+                init_fill_method=fill_method,
+                normalize_columns=normalize_columns,
+                min_value=0,
+                max_value=1,
+            ),
+            name="IterativeSVD_rank%d" % (rank,))
+        table.add_entry(
+            solver=MatrixFactorization(
+                rank,
+                l1_penalty=0.1,
+                l2_penalty=0.1,
+                normalize_columns=normalize_columns,
+                min_value=0,
+                max_value=1),
+            name="MatrixFactorization_rank%d" % rank)
     table.save_html_table()
     table.print_sorted_errors()

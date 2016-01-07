@@ -124,42 +124,6 @@ class Solver(object):
         self._check_missing_value_mask(missing_mask)
         return X, missing_mask
 
-    def biscale(self, X):
-        """
-        TODO: Implement iterative estimation of row and column centering/scaling
-        parameters using the algorithm from page 31 of:
-        Matrix Completion and Low-Rank SVD via Fast Alternating Least Squares
-
-        row_center[i] =
-            sum{j in observed[i, :]}{
-                (1 / column_scale[j]) * (X[i, j] - column_center[j])
-            }
-            ------------------------------------------------------------
-            sum{j in observed[i, :]}{1 / column_scale[j]}
-
-        column_center[j] =
-            sum{i in observed[:, j]}{
-                (1 / row_scale[i]) * (X[i, j]) - row_center[i])
-            }
-            ------------------------------------------------------------
-            sum{i in observed[:, j]}{1 / row_scale[i]}
-
-        row_scale[i]**2 =
-            mean{j in observed[i, :]}{
-                (X[i, j] - row_center[i] - column_center[j]) ** 2
-                --------------------------------------------------
-                            column_scale[j] ** 2
-            }
-
-        column_scale[j] ** 2 =
-            mean{i in observed[:, j]}{
-                (X[i, j] - row_center[i] - column_center[j]) ** 2
-                -------------------------------------------------
-                            row_scale[i] ** 2
-            }
-        """
-        raise ValueError("Bi-scaling not yet implemented")
-
     def normalize_input_matrix(self, X, inplace=False):
         if not inplace:
             X = X.copy()
