@@ -31,7 +31,7 @@ class MICE(Solver):
             n_imputations=100,
             n_burn_in=10,  # this many replicates will be thrown away
             n_neighbors=5,  # number of nearest neighbors in PMM
-            impute_type='row',
+            impute_type='col',
             model=BayesianRidgeRegression(lambda_reg=1e-5),
             add_ones=True,
             approximate_but_fast_mode=False):

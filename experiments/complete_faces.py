@@ -8,7 +8,7 @@ import numpy as np
 
 from fancyimpute import (
     AutoEncoder,
-    # MICE,
+    MICE,
     MatrixFactorization,
     # NuclearNormMinimization,
     SimpleFill,
