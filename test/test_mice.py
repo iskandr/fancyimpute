@@ -5,7 +5,7 @@ from common import reconstruction_error
 
 
 def test_mice_column_with_low_rank_random_matrix():
-    mice = MICE(n_imputations=100, impute_type='col')
+    mice = MICE(n_imputations=100, impute_type='col',approximate_but_fast_mode=False)
     XY_completed = mice.complete(XY_incomplete, verbose=False)
     _, missing_mae = reconstruction_error(
         XY,
@@ -16,7 +16,7 @@ def test_mice_column_with_low_rank_random_matrix():
 
 
 def test_mice_row_with_low_rank_random_matrix():
-    mice = MICE(n_imputations=100, impute_type='row')
+    mice = MICE(n_imputations=100, impute_type='row',approximate_but_fast_mode=False)
     XY_completed = mice.complete(XY_incomplete, verbose=False)
     _, missing_mae = reconstruction_error(
         XY,
