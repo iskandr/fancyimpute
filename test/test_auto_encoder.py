@@ -8,23 +8,22 @@ def test_auto_encoder_with_low_rank_random_matrix():
     solver = AutoEncoder(
         hidden_layer_sizes=None,
         hidden_activation="tanh",
-        optimizer="adam")
+        optimizer="adam",
+        recurrent_weight=0.0)
     XY_completed = solver.complete(
-        XY_incomplete,
-        X_complete=XY)
+        XY_incomplete)
     _, missing_mae = reconstruction_error(XY, XY_completed, missing_mask)
     assert missing_mae < 0.1, "Error too high!"
 
 
 def test_auto_encoder_with_low_rank_random_matrix_using_hallucination():
     solver = AutoEncoder(
-        hidden_layer_sizes=None,
+        hidden_layer_sizes=[3],
         hidden_activation="tanh",
-        optimizer="adam")
+        optimizer="adam",
+        recurrent_weight=0.5)
     XY_completed = solver.complete(
-        XY_incomplete,
-        X_complete=XY,
-        hallucination_weight=1.0)
+        XY_incomplete)
     _, missing_mae = reconstruction_error(XY, XY_completed, missing_mask)
     assert missing_mae < 0.1, "Error too high!"
 

@@ -10,6 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 import numpy as np
 
 
@@ -26,9 +28,64 @@ def masked_mse(X_true, X_pred, mask):
 def generate_random_column_samples(column):
     col_mask = np.isnan(column)
     n_missing = np.sum(col_mask)
+    if n_missing == len(column):
+        logging.warn("No observed values in column")
+        return np.zeros_like(column)
+
     mean = np.nanmean(column)
     std = np.nanstd(column)
+
     if np.isclose(std, 0):
         return np.array([mean] * n_missing)
     else:
         return np.random.randn(n_missing) * std + mean
+
+
+def choose_solution_using_percentiles(
+        X_original,
+        solutions,
+        parameters=None,
+        verbose=False,
+        percentiles=list(range(10, 100, 10))):
+    """
+    It's tricky to pick a single matrix out of all the candidate
+    solutions with differing shrinkage thresholds.
+    Our heuristic is to pick the matrix whose percentiles match best
+    between the missing and observed data.
+    """
+    missing_mask = np.isnan(X_original)
+    min_mse = np.inf
+    best_solution = None
+    for i, candidate in enumerate(solutions):
+        for col_idx in range(X_original.shape[1]):
+            col_data = candidate[:, col_idx]
+            col_missing = missing_mask[:, col_idx]
+            col_observed = ~col_missing
+            if col_missing.sum() < 2:
+                continue
+            elif col_observed.sum() < 2:
+                continue
+            missing_data = col_data[col_missing]
+            observed_data = col_data[col_observed]
+
+            missing_percentiles = np.array([
+                np.percentile(missing_data, p)
+                for p in percentiles])
+
+            observed_percentiles = np.array([
+                np.percentile(observed_data, p)
+                for p in percentiles])
+
+            mse = np.mean((missing_percentiles - observed_percentiles) ** 2)
+        if mse < min_mse:
+            min_mse = mse
+            best_solution = candidate
+        if verbose:
+            print("Candidate #%d/%d%s: %f" % (
+                i + 1,
+                len(solutions),
+                (" (parameter=%s) " % parameters[i]
+                    if parameters is not None
+                    else ""),
+                mse))
+    return best_solution

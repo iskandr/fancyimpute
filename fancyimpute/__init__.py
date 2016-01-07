@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from . import common
+from . import (common, neuralnet_helpers)
 from .solver import Solver
 from .nuclear_norm_minimization import NuclearNormMinimization
 from .bayesian_ridge_regression import BayesianRidgeRegression
@@ -10,9 +10,9 @@ from .auto_encoder import AutoEncoder
 from .matrix_factorization import MatrixFactorization
 from .iterative_svd import IterativeSVD
 from .simple_fill import SimpleFill
+from .soft_impute import SoftImpute
 
 __all__ = [
-    "common",
     "NuclearNormMinimization",
     "BayesianRidgeRegression",
     "BayesianRegression",
@@ -22,4 +22,7 @@ __all__ = [
     "Solver",
     "SimpleFill",
     "IterativeSVD",
+    "SoftImpute",
+    "common",
+    "neuralnet_helpers",
 ]

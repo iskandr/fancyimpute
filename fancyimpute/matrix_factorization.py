@@ -34,22 +34,33 @@ class MatrixFactorization(Solver):
     """
     def __init__(
             self,
-            k=10,
+            rank=10,
             initializer=np.random.randn,
             learning_rate=0.001,
-            patience=3,
-            l1_penalty_weight=0.001,
-            l2_penalty_weight=0.001,
+            patience=5,
+            l1_penalty=0.1,
+            l2_penalty=0.1,
             min_improvement=0.005,
             max_gradient_norm=5,
             optimization_algorithm="adam",
+            n_imputations=1,
+            normalize_columns=True,
+            min_value=None,
+            max_value=None,
             verbose=True):
-        self.k = k
+        Solver.__init__(
+            self,
+            fill_method="zero",
+            normalize_columns=normalize_columns,
+            min_value=min_value,
+            max_value=max_value,
+            n_imputations=n_imputations)
+        self.rank = rank
         self.initializer = initializer
         self.learning_rate = learning_rate
         self.patience = patience
-        self.l1_penalty_weight = l1_penalty_weight
-        self.l2_penalty_weight = l2_penalty_weight
+        self.l1_penalty = l1_penalty
+        self.l2_penalty = l2_penalty
         self.max_gradient_norm = max_gradient_norm
         self.optimization_algorithm = optimization_algorithm
         self.min_improvement = min_improvement
@@ -58,22 +69,13 @@ class MatrixFactorization(Solver):
         if self.verbose:
             climate.enable_default_logging()
 
-    def complete(self, X, verbose=True):
-        """
-        Expects 2d float matrix with NaN entries signifying missing values
-
-        Returns completed matrix without any NaNs.
-        """
-        X, missing_mask = self.prepare_data(X, inplace=False)
-
-        # replace NaN's with 0
-        X[missing_mask] = 0
+    def solve(self, X, missing_mask):
         (n_samples, n_features) = X.shape
         observed_mask = 1 - missing_mask
 
         # Set up a matrix factorization problem to optimize.
-        U_init = self.initializer(n_samples, self.k).astype(X.dtype)
-        V_init = self.initializer(self.k, n_features).astype(X.dtype)
+        U_init = self.initializer(n_samples, self.rank).astype(X.dtype)
+        V_init = self.initializer(self.rank, n_features).astype(X.dtype)
         U = theano.shared(U_init, name="U")
         V = theano.shared(V_init, name="V")
         X_symbolic = T.matrix(name="X", dtype=X.dtype)
@@ -86,9 +88,8 @@ class MatrixFactorization(Solver):
         mse = err.mean()
         loss = (
             mse +
-            self.l1_penalty_weight * abs(U).mean() +
-            self.l2_penalty_weight * (V * V).mean()
-        )
+            self.l1_penalty * abs(U).mean() +
+            self.l2_penalty * (V * V).mean())
         downhill.minimize(
             loss=loss,
             train=[X],
@@ -96,15 +97,11 @@ class MatrixFactorization(Solver):
             algo=self.optimization_algorithm,
             batch_size=n_samples,
             min_improvement=self.min_improvement,
-            max_gradient_norm=self.max_gradient_norm,  # Prevent gradient explosion!
+            max_gradient_norm=self.max_gradient_norm,
             learning_rate=self.learning_rate,
-            monitors=(('err', err.mean()),    # Monitor during optimization.
-                      ('|u|<0.1', (abs(U) < 0.1).mean()),
-                      ('|v|<0.1', (abs(U) < 0.1).mean())),
+            monitors=[("error", err.mean())],
             monitor_gradients=self.verbose)
 
         U_value = U.get_value()
         V_value = V.get_value()
-        X_full = np.dot(U_value, V_value)
-        X[missing_mask] = X_full[missing_mask]
-        return X
+        return np.dot(U_value, V_value)

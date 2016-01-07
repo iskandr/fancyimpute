@@ -13,10 +13,11 @@
 from __future__ import absolute_import, print_function, division
 
 import cvxpy
-import numpy as np
+
+from .solver import Solver
 
 
-class NuclearNormMinimization(object):
+class NuclearNormMinimization(Solver):
     """
     Simple implementation of "Exact Matrix Completion via Convex Optimization"
     by Emmanuel Candes and Benjamin Recht using cvxpy.
@@ -25,44 +26,36 @@ class NuclearNormMinimization(object):
     def __init__(
             self,
             require_symmetric_solution=False,
+            normalize_columns=False,
             min_value=None,
             max_value=None,
-            error_tolerance=0.0):
+            error_tolerance=0.0,
+            fast_but_approximate=True,
+            verbose=True):
+        Solver.__init__(
+            self,
+            normalize_columns=normalize_columns,
+            min_value=min_value,
+            max_value=max_value)
         self.require_symmetric_solution = require_symmetric_solution
-        self.min_value = min_value
-        self.max_value = max_value
         self.error_tolerance = error_tolerance
+        self.fast_but_approximate = fast_but_approximate
+        self.verbose = verbose
 
-    def _check_input(self, X):
-        if len(X.shape) != 2:
-            raise ValueError("Expected 2d matrix, got %s array" % (X.shape,))
-        if self.require_symmetric_solution and (X.shape[0] != X.shape[1]):
-            raise ValueError(
-                "Expected square matrix, got %s array" % (X.shape,))
-
-    def _check_missing_value_mask(self, missing):
-        if not missing.any():
-            raise ValueError("Input matrix is not missing any values")
-        if missing.all():
-            raise ValueError("Input matrix must have some non-missing values")
-
-    def _constraints(self, X, S, error_tolerance):
+    def _constraints(self, X, missing_mask, S, error_tolerance):
         """
         Parameters
         ----------
         X : np.array
-            Data matrix with missing values
+            Data matrix with missing values filled in
+
+        missing_mask : np.array
+            Boolean array indicating where missing values were
+
         S : cvxpy.Variable
             Representation of solution variable
         """
-        missing_values = np.isnan(X)
-        self._check_missing_value_mask(missing_values)
-        # copy the array before modifying it
-        X = X.copy()
-        # zero out the NaN values
-        X[missing_values] = 0
-        ok_mask = ~missing_values
-
+        ok_mask = ~missing_mask
         masked_X = cvxpy.mul_elemwise(ok_mask, X)
         masked_S = cvxpy.mul_elemwise(ok_mask, S)
         abs_diff = cvxpy.abs(masked_S - masked_X)
@@ -94,42 +87,17 @@ class NuclearNormMinimization(object):
         objective = cvxpy.Minimize(norm)
         return S, objective
 
-    def _get_solution(self, S):
-        """
-        Get the solution data from the cvxpy Variable and threshold to stay
-        within the desired range of values.
-        """
-        result = S.value
-        if self.min_value is not None:
-            result[result < self.min_value] = self.min_value
-        if self.max_value is not None:
-            result[result > self.max_value] = self.max_value
-        return result
-
-    def complete(
-            self,
-            X,
-            fast_but_approximate=True,
-            verbose=True):
-
-        """
-        Expects 2d float matrix with NaN entries signifying missing values
-
-        Returns completed matrix without any NaNs.
-        """
-        self._check_input(X)
+    def solve(self, X, missing_mask):
         m, n = X.shape
         S, objective = self._create_objective(m, n)
         constraints = self._constraints(
             X=X,
+            missing_mask=missing_mask,
             S=S,
             error_tolerance=self.error_tolerance)
         problem = cvxpy.Problem(objective, constraints)
         problem.solve(
-            verbose=True,
+            verbose=self.verbose,
             # SCS solver is known to be faster but less exact
-            solver=cvxpy.SCS if fast_but_approximate else None)
-        return self.clip_result(
-            S.value,
-            min_value=self.min_value,
-            max_value=self.max_value)
+            solver=cvxpy.SCS if self.fast_but_approximate else None)
+        return S.value
