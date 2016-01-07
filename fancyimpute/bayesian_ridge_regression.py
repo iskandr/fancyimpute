@@ -39,7 +39,7 @@ class BayesianRidgeRegression(object):
     def predict(self, X, random_draw=False):
         X_ones = self.add_column_of_ones(X)
         if random_draw:
-            return np.dot(X_ones, self.random_beta_draw(1)[0])
+            return np.dot(X_ones, self.random_beta_draw(num_draws=1)[0])
         else:
             return np.dot(X_ones, self.beta_estimate)
 
