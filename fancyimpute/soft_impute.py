@@ -27,13 +27,13 @@ class SoftImpute(Solver):
 
     Basic algorithm sketch:
     1. Initialize Z_old = 0.
-    2. Do for λ1 > λ2 >...>λK:
+    2. Do for lambda1 > lambda2 > ... > lambdaK:
     (a) Repeat:
-        i. Compute Z_new ← S_λi (Observed(X)+Missing(Z_old))
+        i. Compute Z_new <- S_lambdai (Observed(X)+Missing(Z_old))
         ii. If norm(Z_old - Z_new) / norm(Z_old) < eps: exit
         iii. Assign Z_old = Z_new
-    (b) Assign Z[λi] = Z_new
-    3. Output the sequence of solutions Z[λi]
+    (b) Assign Z[lambdai] = Z_new
+    3. Output the sequence of solutions Z[lambdai]
     """
     def __init__(
             self,

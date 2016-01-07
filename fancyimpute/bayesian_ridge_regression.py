@@ -16,28 +16,38 @@ import numpy as np
 
 
 class BayesianRidgeRegression(object):
-    def __init__(self, lam=1e-5):
-        self.lam = lam
+    def __init__(self, lambda_reg=1e-5,add_ones=False):
+        self.lambda_reg = lambda_reg
+        self.add_ones = add_ones
 
-    def fit(self, X, y):
-        X_ones = self.add_column_of_ones(X)
+    def fit(self, X, y, inverse_covariance=None):
+        if self.add_ones:
+            X_ones = self.add_column_of_ones(X)
+        else:
+            X_ones = X
         # first add a column of all ones to X
         n, d = X_ones.shape
         # regularization matrix
-        regularization_matrix = self.lam * np.eye(d)
+        regularization_matrix = self.lambda_reg * np.eye(d)
         regularization_matrix[-1, -1] = 0  # don't need to regularize the intercept
-        # the big expensive inverse that we use over and over
-        self.inv_matrix = np.linalg.inv(
-            np.dot(X_ones.T, X_ones) + regularization_matrix)
+        # the big expensive step when d is large
+        if inverse_covariance is None:
+            self.inverse_covariance = np.linalg.inv(
+                np.dot(X_ones.T, X_ones) + regularization_matrix)
+        else:
+            self.inverse_covariance = inverse_covariance
         # estimate of the parameters
-        self.beta_estimate = np.dot(np.dot(self.inv_matrix, X_ones.T), y)
+        self.beta_estimate = np.dot(np.dot(self.inverse_covariance, X_ones.T), y)
         # now we need the estimate of the noise variance
         # reference: https://stat.ethz.ch/R-manual/R-devel/library/stats/html/summary.lm.html
         residuals_sqr = (y - self.predict(X)) ** 2
         self.sigma_squared_estimate = np.sum(residuals_sqr) / np.maximum((n - d), 1)
 
     def predict(self, X, random_draw=False):
-        X_ones = self.add_column_of_ones(X)
+        if self.add_ones:
+            X_ones = self.add_column_of_ones(X)
+        else:
+            X_ones = X
         if random_draw:
             return np.dot(X_ones, self.random_beta_draw(num_draws=1)[0])
         else:
@@ -55,14 +65,17 @@ class BayesianRidgeRegression(object):
     # note that the pros do wackier stuff: https://github.com/jwb133/smcfcs/blob/master/R/smcfcs.r
     # see lines 363 to 365. not sure what exactly is happening here
     def random_beta_draw(self, num_draws=1):
-        covar = self.sigma_squared_estimate * self.inv_matrix
+        covar = self.sigma_squared_estimate * self.inverse_covariance
         return np.random.multivariate_normal(self.beta_estimate, covar, num_draws)
 
     # posterior predictive draw
     def predict_dist(self, X):
-        X_ones = self.add_column_of_ones(X)  # adding constant offset
+        if self.add_ones:
+            X_ones = self.add_column_of_ones(X) 
+        else:
+            X_ones = X
         mus = self.predict(X)
-        covar = self.sigma_squared_estimate * self.inv_matrix
+        covar = self.sigma_squared_estimate * self.inverse_covariance
         sigmas_squared = self.sigma_squared_estimate + np.sum(
             np.dot(X_ones, covar) * X_ones, axis=1)
         return mus, sigmas_squared
