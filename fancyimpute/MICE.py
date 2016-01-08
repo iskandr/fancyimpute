@@ -80,7 +80,7 @@ class MICE(Solver):
         
         """
         other_cols = np.array(list(range(0, col)) + list(range(col + 1, self.d)))
-        F = self.S_inv[other_cols,:][:,other_cols]
+        F = self.S_inv[np.ix_(other_cols,other_cols)]
         sigma_squared = self.S_inv[col,col]
         u = -self.S_inv[col,other_cols] / sigma_squared
         S_inv_sub = F - sigma_squared*np.outer(u,u)
@@ -128,7 +128,7 @@ class MICE(Solver):
                 # The other columns we will use to predict the current one
                 other_cols = np.array(list(range(0, col)) + list(range(col + 1, self.d)))
                 # only take rows for which we have observed vals for the current column
-                inputs = self.X_filled[observed_row_mask_for_col][:, other_cols]
+                inputs = self.X_filled[np.ix_(observed_row_mask_for_col,other_cols)]
                 output = self.X_filled[observed_row_mask_for_col, col]
                 brr = self.model
                 # now we either use an approximate inverse (fast updates)
@@ -143,10 +143,10 @@ class MICE(Solver):
                 # Now we choose the row method (PMM) or the column method.
                 if self.impute_type == 'row':  # this is the PMM procedure
                     # predict values for missing values using random beta draw
-                    X_missing = self.X_filled[missing_mask_col][:, other_cols]
+                    X_missing = self.X_filled[np.ix_(missing_mask_col,other_cols)]
                     col_preds_missing = brr.predict(X_missing, random_draw=True)
                     # predict values for observed values using best estimated beta
-                    X_observed = self.X_filled[observed_row_mask_for_col][:, other_cols]
+                    X_observed = self.X_filled[np.ix_(observed_row_mask_for_col,other_cols)]
                     col_preds_observed = brr.predict(X_observed, random_draw=False)
                     # for each missing value, find its nearest neighbors in the observed values
                     D = np.abs(col_preds_missing[:, np.newaxis] - col_preds_observed)  # distances
@@ -162,7 +162,7 @@ class MICE(Solver):
                     self.X_filled[missing_mask_col, col] = \
                         self.X_filled[observed_row_mask_for_col, col][NN_sampled]
                 elif self.impute_type == 'col':
-                    X_missing = self.X_filled[missing_mask_col][:, other_cols]
+                    X_missing = self.X_filled[np.ix_(missing_mask_col,other_cols)]
                     # predict values for missing values using posterior predictive draws
                     # see the end of this:
                     # https://www.cs.utah.edu/~fletcher/cs6957/lectures/BayesianLinearRegression.pdf
