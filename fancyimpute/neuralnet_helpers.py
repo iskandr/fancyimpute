@@ -48,6 +48,7 @@ def make_network(
         hidden_layer_sizes=None,
         dropout_probability=0,
         optimizer="adam",
+        init="glorot_normal",
         l1_penalty=0,
         l2_penalty=0):
     if not hidden_layer_sizes:
@@ -68,20 +69,23 @@ def make_network(
         first_layer_size,
         input_dim=2 * n_dims,
         activation=hidden_activation,
-        W_regularizer=l1l2(l1_penalty, l2_penalty)))
+        W_regularizer=l1l2(l1_penalty, l2_penalty),
+        init=init))
     nn.add(Dropout(dropout_probability))
 
     for layer_size in hidden_layer_sizes[1:]:
         nn.add(Dense(
             layer_size,
             activation=hidden_activation,
-            W_regularizer=l1l2(l1_penalty, l2_penalty)))
+            W_regularizer=l1l2(l1_penalty, l2_penalty),
+            init=init))
         nn.add(Dropout(dropout_probability))
     nn.add(
         Dense(
             n_dims,
             activation=output_activation,
-            W_regularizer=l1l2(l1_penalty, l2_penalty)))
+            W_regularizer=l1l2(l1_penalty, l2_penalty),
+            init=init))
     loss_function = make_reconstruction_loss(
         n_dims,
         mask_indicates_missing_values=True)

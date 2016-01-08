@@ -22,38 +22,45 @@ class IterativeSVD(Solver):
             self,
             rank,
             max_iters=100,
-            min_difference_between_iters=0.001,
-            min_fraction_improvement=0.999,
-            patience=5,
+            convergence_threshold=0.001,
+            gradual_rank_increase=True,
             svd_algorithm="arpack",
             init_fill_method="zero",
-            n_imputations=1,
-            normalize_columns=True,
             min_value=None,
             max_value=None,
             verbose=True):
         Solver.__init__(
             self,
             fill_method=init_fill_method,
-            n_imputations=n_imputations,
-            normalize_columns=normalize_columns,
             min_value=min_value,
             max_value=max_value)
         self.rank = rank
         self.max_iters = max_iters
-        self.patience = patience
         self.svd_algorithm = svd_algorithm
-        self.min_fraction_improvement = min_fraction_improvement
+        self.convergence_threshold = convergence_threshold
+        self.gradual_rank_increase = gradual_rank_increase
         self.verbose = verbose
+
+    def _converged(self, X_old, X_new, missing_mask):
+        # check for convergence
+        old_missing_values = X_old[missing_mask]
+        new_missing_values = X_new[missing_mask]
+        difference = old_missing_values - new_missing_values
+        ssd = np.sum(difference ** 2)
+        old_norm_squared = (old_missing_values ** 2).sum()
+        return (ssd / old_norm_squared) < self.convergence_threshold
 
     def solve(self, X, missing_mask):
         observed_mask = ~missing_mask
-        best_mae = np.inf
-        best_solution = X
-        iters_since_best = 0
         X_filled = X
         for i in range(self.max_iters):
-            tsvd = TruncatedSVD(self.rank, algorithm=self.svd_algorithm)
+            # deviation from original svdImpute algorithm:
+            # gradually increase the rank of our approximation
+            if self.gradual_rank_increase:
+                curr_rank = min(2 ** i, self.rank)
+            else:
+                curr_rank = self.rank
+            tsvd = TruncatedSVD(curr_rank, algorithm=self.svd_algorithm)
             X_reduced = tsvd.fit_transform(X_filled)
             X_reconstructed = tsvd.inverse_transform(X_reduced)
             mae = masked_mae(
@@ -64,22 +71,11 @@ class IterativeSVD(Solver):
                 print(
                     "[IterativeSVD] Iter %d: observed MAE=%0.6f" % (
                         i + 1, mae))
-            X_filled = X.copy()
+            converged = self._converged(
+                X_old=X_filled,
+                X_new=X_reconstructed,
+                missing_mask=missing_mask)
             X_filled[missing_mask] = X_reconstructed[missing_mask]
-            if i == 0:
-                best_mae = mae
-                best_solution = X_filled.copy()
-                iters_since_best = 0
-            elif mae / best_mae < self.min_fraction_improvement:
-                best_mae = mae
-                best_solution = X_filled.copy()
-                iters_since_best = 0
-            elif iters_since_best > self.patience:
-                if self.verbose:
-                    print(
-                        "[IterativeSVD] Patience exceeded on iter %d" % (
-                            i + 1,))
+            if converged:
                 break
-            else:
-                iters_since_best += 1
-        return best_solution
+        return X_filled

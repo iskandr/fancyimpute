@@ -11,6 +11,8 @@ from .matrix_factorization import MatrixFactorization
 from .iterative_svd import IterativeSVD
 from .simple_fill import SimpleFill
 from .soft_impute import SoftImpute
+from .biscaler import BiScaler
+from .dense_knn import DenseKNN
 
 __all__ = [
     "NuclearNormMinimization",
@@ -25,4 +27,6 @@ __all__ = [
     "SoftImpute",
     "common",
     "neuralnet_helpers",
+    "BiScaler",
+    "DenseKNN",
 ]

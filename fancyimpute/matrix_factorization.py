@@ -38,23 +38,19 @@ class MatrixFactorization(Solver):
             initializer=np.random.randn,
             learning_rate=0.001,
             patience=5,
-            l1_penalty=0.1,
-            l2_penalty=0.1,
+            l1_penalty=0.05,
+            l2_penalty=0.05,
             min_improvement=0.005,
             max_gradient_norm=5,
             optimization_algorithm="adam",
-            n_imputations=1,
-            normalize_columns=True,
             min_value=None,
             max_value=None,
             verbose=True):
         Solver.__init__(
             self,
             fill_method="zero",
-            normalize_columns=normalize_columns,
             min_value=min_value,
-            max_value=max_value,
-            n_imputations=n_imputations)
+            max_value=max_value)
         self.rank = rank
         self.initializer = initializer
         self.learning_rate = learning_rate

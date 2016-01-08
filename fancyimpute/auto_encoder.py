@@ -40,23 +40,19 @@ class AutoEncoder(Solver):
             l1_penalty=0,
             l2_penalty=0,
             recurrent_weight=0.5,
-            n_burn_in_epochs=20,
+            n_burn_in_epochs=0,
             missing_input_noise_weight=0,
             output_history_size=25,
             patience_epochs=20,
-            min_improvement=0.995,
+            min_improvement=0.999,
             max_training_epochs=None,
             init_fill_method="zero",
-            n_imputations=1,
-            normalize_columns=False,
             min_value=None,
             max_value=None,
             verbose=True):
         Solver.__init__(
             self,
             fill_method=init_fill_method,
-            normalize_columns=normalize_columns,
-            n_imputations=n_imputations,
             min_value=min_value,
             max_value=max_value)
 
@@ -153,9 +149,7 @@ class AutoEncoder(Solver):
 
         observed_mask = ~missing_mask
 
-        recent_errors = []
         best_error_seen = np.inf
-        best_error_seen_median = np.inf
         epochs_since_best_error = 0
         recent_predictions = deque([], maxlen=self.output_history_size)
 
@@ -166,23 +160,21 @@ class AutoEncoder(Solver):
                 X_true=X,
                 X_pred=X_pred,
                 mask=observed_mask)
-            if self.verbose:
-                print("[AutoEncoder] Epoch %d/%d Observed MAE=%f" % (
-                    epoch + 1,
-                    max_training_epochs,
-                    observed_mae))
+
             if epoch == 0:
                 best_error_seen = observed_mae
-                recent_errors = [observed_mae]
-            elif observed_mae / best_error_seen_median < self.min_improvement:
+            elif observed_mae / best_error_seen < self.min_improvement:
                 best_error_seen = observed_mae
-                best_error_seen_median = np.median(recent_errors)
-                recent_errors = [observed_mae]
                 epochs_since_best_error = 0
             else:
                 epochs_since_best_error += 1
-                recent_errors.append(observed_mae)
 
+            if self.verbose:
+                print("[AutoEncoder] Epoch %d/%d Observed MAE=%f %s" % (
+                    epoch + 1,
+                    max_training_epochs,
+                    observed_mae,
+                    " *" if epochs_since_best_error == 0 else ""))
             if patience_epochs and epochs_since_best_error > patience_epochs:
                 if self.verbose:
                     print(
@@ -195,7 +187,7 @@ class AutoEncoder(Solver):
             # pre-specified number of epochs exceeded
             if epoch >= self.n_burn_in_epochs:
                 old_weight = (1.0 - self.recurrent_weight)
-                X[missing_mask] = old_weight * X[missing_mask]
+                X[missing_mask] *= old_weight
                 pred_missing = X_pred[missing_mask]
                 X[missing_mask] += self.recurrent_weight * pred_missing
                 if self.missing_input_noise_weight:

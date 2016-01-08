@@ -25,7 +25,6 @@ class SimpleFill(Solver):
         """
         Solver.__init__(
             self,
-            normalize_columns=False,
             fill_method=fill_method,
             min_value=None,
             max_value=None)

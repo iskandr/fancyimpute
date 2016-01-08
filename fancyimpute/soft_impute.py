@@ -38,15 +38,13 @@ class SoftImpute(Solver):
     def __init__(
             self,
             shrinkage_value=None,
-            convergence_threshold=0.001,
+            convergence_threshold=0.00001,
             max_iters=200,
             max_rank=None,
             n_power_iterations=1,
             init_fill_method="zero",
-            normalize_columns=True,
             min_value=None,
             max_value=None,
-            n_imputations=1,
             verbose=True):
         """
         Parameters
@@ -75,18 +73,11 @@ class SoftImpute(Solver):
             How to initialize missing values of data matrix, default is
             to fill them with zeros.
 
-        normalize_columns : bool
-            Rescale and center each feature before imputation
-
         min_value : float
             Smallest allowable value in the solution
 
         max_value : float
             Largest allowable value in the solution
-
-        n_imputations : int
-            Number of imputations to perform. Only makes sense if using a
-            randomized initialization method.
 
         verbose : bool
             Print debugging info
@@ -94,8 +85,6 @@ class SoftImpute(Solver):
         Solver.__init__(
             self,
             fill_method=init_fill_method,
-            n_imputations=n_imputations,
-            normalize_columns=normalize_columns,
             min_value=min_value,
             max_value=max_value)
         self.shrinkage_value = shrinkage_value
@@ -111,8 +100,8 @@ class SoftImpute(Solver):
         new_missing_values = X_new[missing_mask]
         difference = old_missing_values - new_missing_values
         ssd = np.sum(difference ** 2)
-        old_norm = (old_missing_values ** 2).sum()
-        return (ssd / old_norm) < self.convergence_threshold
+        old_norm = np.sqrt((old_missing_values ** 2).sum())
+        return (np.sqrt(ssd) / old_norm) < self.convergence_threshold
 
     def _svd_step(self, X, shrinkage_value, max_rank=None):
         """
@@ -183,12 +172,13 @@ class SoftImpute(Solver):
                         mae,
                         rank))
 
-            if self._converged(
-                    X_old=X_filled,
-                    X_new=X_reconstruction,
-                    missing_mask=missing_mask):
-                break
+            converged = self._converged(
+                X_old=X_filled,
+                X_new=X_reconstruction,
+                missing_mask=missing_mask)
             X_filled[missing_mask] = X_reconstruction[missing_mask]
+            if converged:
+                break
         if self.verbose:
             print("[SoftImpute] Stopped after iteration %d for lambda=%f" % (
                 i + 1,

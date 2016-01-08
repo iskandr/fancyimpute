@@ -14,6 +14,8 @@ from fancyimpute import (
     SimpleFill,
     IterativeSVD,
     SoftImpute,
+    BiScaler,
+    DenseKNN,
 )
 from fancyimpute.common import masked_mae, masked_mse
 
@@ -51,10 +53,11 @@ class ResultsTable(object):
             images,
             width=64,
             height=64,
-            missing_square_size=32,
+            missing_square_size=25,
             saved_image_stride=75,
             dirname="face_images"):
-        self.original = self.normalize(images)
+        self.original = self.rescale_pixel_values(images)
+
         self.width = width
         self.height = height
         assert images.shape[1] == width * height
@@ -64,6 +67,10 @@ class ResultsTable(object):
             height=height,
             missing_square_size=missing_square_size)
         self.missing_mask = np.isnan(self.incomplete)
+        self.normalizer = BiScaler(scale_rows=False, min_value=0, max_value=1)
+        self.incomplete_normalized = self.normalizer.fit_transform(
+            self.incomplete)
+
         self.n_images = len(original)
         self.saved_image_indices = list(
             range(0, self.n_images, saved_image_stride))
@@ -75,7 +82,7 @@ class ResultsTable(object):
         self.save_images(self.original, "original")
         self.save_images(self.incomplete, "incomplete")
 
-    def normalize(self, images):
+    def rescale_pixel_values(self, images):
         """
         Rescale the range of values in images to be between [0, 1]
         """
@@ -112,7 +119,9 @@ class ResultsTable(object):
 
     def add_entry(self, solver, name):
         print("Running %s" % name)
-        completed = solver.complete(self.incomplete)
+        completed_normalized = solver.complete(self.incomplete_normalized)
+        completed = self.normalizer.inverse_transform(completed_normalized)
+
         mae = masked_mae(
             X_true=self.original,
             X_pred=completed,
@@ -173,56 +182,52 @@ if __name__ == "__main__":
     original = dataset.data
 
     table = ResultsTable(original)
-
-    for fill_method in ["mean"]:
+    """
+    for k in [1, 3, 5]:
         table.add_entry(
-            solver=SimpleFill(fill_method=fill_method),
-            name="SimpleFill_%s" % fill_method)
-
-    normalize_columns = True
+            solver=DenseKNN(
+                k=k,
+                orientation="rows"),
+            name="DenseKNN_k%d" % (k,))
 
     for shrinkage_value in [25, 50, 100]:
         # SoftImpute without rank constraints
         table.add_entry(
             solver=SoftImpute(
-                shrinkage_value=shrinkage_value,
-                normalize_columns=normalize_columns,
-                min_value=0,
-                max_value=1),
+                shrinkage_value=shrinkage_value),
             name="SoftImpute_lambda%d" % (shrinkage_value,))
-
+    """
     for rank in [5, 50]:
-        print("AutoEncoder rank = %d" % rank)
-        table.add_entry(
-            solver=AutoEncoder(
-                optimizer="adam",
-                hidden_layer_sizes=[200, rank],
-                hidden_activation="tanh",
-                output_activation="linear",
-                normalize_columns=normalize_columns,
-                patience_epochs=50,
-                missing_input_noise_weight=0,
-                min_value=0,
-                max_value=1,
-            ),
-            name="AutoEncoder_rank%d" % (rank,))
+        """
         table.add_entry(
             solver=IterativeSVD(
                 rank=rank,
-                init_fill_method=fill_method,
-                normalize_columns=normalize_columns,
-                min_value=0,
-                max_value=1,
-            ),
+                init_fill_method="zero"),
             name="IterativeSVD_rank%d" % (rank,))
+        """
+        table.add_entry(
+            solver=AutoEncoder(
+                hidden_layer_sizes=[200, rank],
+                hidden_activation="tanh",
+                output_activation="linear",
+                patience_epochs=25,
+                n_burn_in_epochs=0,
+                recurrent_weight=1.0,
+                missing_input_noise_weight=0,
+            ),
+            name="AutoEncoder_rank%d" % (rank,))
+
         table.add_entry(
             solver=MatrixFactorization(
                 rank,
                 l1_penalty=0.1,
-                l2_penalty=0.1,
-                normalize_columns=normalize_columns,
-                min_value=0,
-                max_value=1),
+                l2_penalty=0.1),
             name="MatrixFactorization_rank%d" % rank)
+
+    for fill_method in ["mean", "median"]:
+        table.add_entry(
+            solver=SimpleFill(fill_method=fill_method),
+            name="SimpleFill_%s" % fill_method)
+
     table.save_html_table()
     table.print_sorted_errors()

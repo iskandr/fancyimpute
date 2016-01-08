@@ -10,21 +10,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
-
 import numpy as np
 
 from .common import generate_random_column_samples
-
-
-InputData = namedtuple("InputData", [
-    "X_original",
-    "X_rescaled",
-    "X_filled",
-    "missing_mask",
-    "column_means",
-    "column_scales"
-])
 
 
 class Solver(object):
@@ -32,14 +20,14 @@ class Solver(object):
             self,
             fill_method="zero",
             n_imputations=1,
-            normalize_columns=False,
             min_value=None,
-            max_value=None):
+            max_value=None,
+            normalizer=None):
         self.fill_method = fill_method
         self.n_imputations = n_imputations
-        self.normalize_columns = normalize_columns
         self.min_value = min_value
         self.max_value = max_value
+        self.normalizer = normalizer
 
     def _check_input(self, X):
         if len(X.shape) != 2:
@@ -124,7 +112,7 @@ class Solver(object):
         self._check_missing_value_mask(missing_mask)
         return X, missing_mask
 
-    def normalize_input_matrix(self, X, inplace=False):
+    def normalize_input_columns(self, X, inplace=False):
         if not inplace:
             X = X.copy()
         column_centers = np.nanmean(X, axis=0)
@@ -134,56 +122,14 @@ class Solver(object):
         X /= column_scales
         return X, column_centers, column_scales
 
-    def project_result(
-            self,
-            X,
-            column_centers=None,
-            column_scales=None,
-            row_centers=None,
-            row_scales=None):
+    def project_result(self, X):
         """
-        The solution matrices may be scaled or centered away from the range
-        of actual values. Undo these transformations and clip values to
-        fall within any global or column-wise min/max constraints.
+        Clip values to fall within any global or column-wise min/max constraints
         """
         X = np.asarray(X)
-        n_rows, n_cols = X.shape
-        if column_scales is not None:
-            if len(column_scales) != n_cols:
-                raise ValueError(
-                    ("Expected vector of column scales to be %d elements, "
-                     "got %d instead") % (
-                        n_cols,
-                        len(column_scales)))
-            # broadcast the column scales across each
-            X *= column_scales
-        if row_scales is not None:
-            if len(row_scales) != n_rows:
-                raise ValueError(
-                    ("Expected vector of row scales to have %d elements, "
-                     "got %d instead") % (
-                        n_rows,
-                        len(row_scales)))
-            X *= row_scales.reshape((n_rows, 1))
 
-        if column_centers is not None:
-            if len(column_centers) != n_cols:
-                raise ValueError(
-                    ("Expected vector of column centers to have %d elements, "
-                     "got %d instead") % (
-                        n_cols,
-                        len(column_centers)))
-            X += column_centers
-
-        if row_centers is not None:
-            if len(row_centers) != n_rows:
-                raise ValueError(
-                    ("Expected vector of row centers to have %d elements, "
-                     "got %d instead") % (
-                        n_rows,
-                        len(row_centers)))
-            X += row_centers.reshape((n_rows, 1))
-
+        if self.normalizer is not None:
+            X = self.normalizer.inverse_transform(X)
         if self.min_value is not None:
             X[X < self.min_value] = self.min_value
         if self.max_value is not None:
@@ -202,12 +148,8 @@ class Solver(object):
         X_original, missing_mask = self.prepare_input_data(X)
         observed_mask = ~missing_mask
         X = X_original.copy()
-        if self.normalize_columns:
-            X, centers, scales = self.normalize_input_matrix(
-                X,
-                inplace=True)
-        else:
-            centers = scales = None
+        if self.normalizer is not None:
+            X = self.normalizer.fit_transform(X)
         X_filled = self.fill(X, missing_mask, inplace=True)
         if not isinstance(X_filled, np.ndarray):
             raise TypeError(
@@ -222,10 +164,7 @@ class Solver(object):
                     self.__class__.__name__,
                     type(X_result)))
 
-        X_result = self.project_result(
-            X=X_result,
-            column_centers=centers,
-            column_scales=scales)
+        X_result = self.project_result(X=X_result)
         X_result[observed_mask] = X_original[observed_mask]
         return X_result
 

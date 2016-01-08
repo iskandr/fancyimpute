@@ -26,7 +26,6 @@ class NuclearNormMinimization(Solver):
     def __init__(
             self,
             require_symmetric_solution=False,
-            normalize_columns=False,
             min_value=None,
             max_value=None,
             error_tolerance=0.0,
@@ -34,7 +33,6 @@ class NuclearNormMinimization(Solver):
             verbose=True):
         Solver.__init__(
             self,
-            normalize_columns=normalize_columns,
             min_value=min_value,
             max_value=max_value)
         self.require_symmetric_solution = require_symmetric_solution
