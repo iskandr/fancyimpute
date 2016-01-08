@@ -34,7 +34,8 @@ class MICE(Solver):
             impute_type='col',
             model=BayesianRidgeRegression(lambda_reg=1e-5),
             add_ones=True,
-            approximate_but_fast_mode=False):
+            approximate_but_fast_mode=False,
+            verbose=True):
         """
         Parameters
         ----------
@@ -58,16 +59,10 @@ class MICE(Solver):
         self.model = model
         self.add_ones = add_ones
         self.approximate_but_fast_mode = approximate_but_fast_mode
+        self.verbose = verbose
         self.S = None # covariance matrix
         self.S_inv = None # inverse covariance matrix
 
-    def _inverse_covariance(self,add_ones=True):
-
-        regularization_matrix = self.model.lambda_reg * np.eye(self.d)
-        regularization_matrix[-1, -1] = 0  # don't need to regularize the intercept
-        # the big expensive inverse that we use over and over
-        X_ones = np.column_stack((self.X_filled, np.ones(self.X_filled.shape[0])))
-        S_inv_full = np.linalg.inv(np.dot(X_ones.T, X_ones) + regularization_matrix)
         
     def _sub_inverse_covariance(self,col):
         """
@@ -126,6 +121,8 @@ class MICE(Solver):
         """
         for col in self.visit_indices:
             missing_mask_col = self.missing_mask[:, col]  # missing mask for this column
+            if self.verbose:
+                print("Column:",col)
             if np.sum(missing_mask_col) > 0:  # if we have any missing data at all
                 observed_row_mask_for_col = self.observed_mask[:, col]  # observed mask for this column
                 # The other columns we will use to predict the current one
@@ -179,7 +176,7 @@ class MICE(Solver):
                     self._update_inverse_covariance(col)
 
 
-    def multiple_imputations(self, X, verbose=True):
+    def multiple_imputations(self, X):
         """
         Expects 2d float matrix with NaN entries signifying missing values
 
@@ -231,7 +228,7 @@ class MICE(Solver):
         # now we jam up in the usual fashion for n_burn_in + n_imputations iterations
         self.X_filled_storage = []  # all of the imputed values, in a flattened format
         for m in range(self.n_burn_in + self.n_imputations):
-            if verbose:
+            if self.verbose:
                 print("Run:", m)
             self._perform_imputation_round()
             if m >= self.n_burn_in:
@@ -239,9 +236,8 @@ class MICE(Solver):
 
         return np.array(self.X_filled_storage), self.missing_mask
 
-    def complete(self, X, verbose=True):
-        X_multiple_imputations, missing_mask = self.multiple_imputations(
-            X, verbose)
+    def complete(self, X):
+        X_multiple_imputations, missing_mask = self.multiple_imputations(X)
         X_completed = X.copy()
         # average the imputed values for each feature
         X_completed[missing_mask] = X_multiple_imputations.mean(axis=0)
