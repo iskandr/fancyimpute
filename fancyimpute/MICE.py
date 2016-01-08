@@ -23,6 +23,36 @@ class MICE(Solver):
     Basic implementation of MICE from R.
     This version assumes all of the columns are continuous,
     and uses linear regression.
+    
+    Parameters
+    ----------
+    visit_sequence : str
+        Possible values: "monotone" (default), "roman", "arabic", "revmonotone".
+
+    n_imputations : int
+        Defaults to 100
+
+    n_burn_in : int
+        Defaults to 10
+
+    impute_type : str
+        "row" means classic PMM, "col" (default) means fill in linear preds.
+        
+    n_neighbors : int
+        Number of nearest neighbors for PMM, defaults to 5.
+
+    model : predictor function
+        A model that has fit, predict, and predict_dist methods.
+        Defaults to BayesianRidgeRegression(lambda_reg=1e-5)
+        
+    add_ones : boolean
+        Whether to add a constant column of ones. Defaults to True.
+        
+    approximate_but_fast_mode : Boolean
+        If True, uses linear algebra trickery to update the inverse covariance.
+        Defaults to False as it is not currently faster than brute force.
+        
+    verbose : boolean
     """
 
     def __init__(
@@ -31,22 +61,42 @@ class MICE(Solver):
             n_imputations=100,
             n_burn_in=10,  # this many replicates will be thrown away
             n_neighbors=5,  # number of nearest neighbors in PMM
-            impute_type='row',
-            model=BayesianRidgeRegression(lam=1e-5)):
+            impute_type='col',
+            model=BayesianRidgeRegression(lambda_reg=1e-5),
+            add_ones=True,
+            approximate_but_fast_mode=False,
+            verbose=True):
         """
         Parameters
         ----------
         visit_sequence : str
-            Possible values: "monotone", "roman", "arabic", "revmonotone"
-
+            Possible values: "monotone" (default), "roman", "arabic", "revmonotone".
+    
         n_imputations : int
-
+            Defaults to 100
+    
         n_burn_in : int
-
+            Defaults to 10
+    
         impute_type : str
-            "row" means classic pmm, "column" means fill in linear preds
+            "row" means classic PMM, "col" (default) means fill in linear preds.
+            
+        n_neighbors : int
+            Number of nearest neighbors for PMM, defaults to 5.
+    
+        model : predictor function
+            A model that has fit, predict, and predict_dist methods.
+            Defaults to BayesianRidgeRegression(lambda_reg=1e-5)
+            
+        add_ones : boolean
+            Whether to add a constant column of ones. Defaults to True.
+            
+        approximate_but_fast_mode : Boolean
+            If True, uses linear algebra trickery to update the inverse covariance.
+            Defaults to False as it is not currently faster than brute force.
+            
+        verbose : boolean
 
-        model : predictor
         """
         self.visit_sequence = visit_sequence
         self.n_imputations = n_imputations
@@ -54,43 +104,96 @@ class MICE(Solver):
         self.n_neighbors = n_neighbors
         self.impute_type = impute_type
         self.model = model
+        self.add_ones = add_ones
+        self.approximate_but_fast_mode = approximate_but_fast_mode
+        self.verbose = verbose
+        self.S = None # covariance matrix
+        self.S_inv = None # inverse covariance matrix
 
-    def _check_input(self, X):
-        if len(X.shape) != 2:
-            raise ValueError("Expected 2d matrix, got %s array" % (X.shape,))
+        
+    def _sub_inverse_covariance(self,col):
+        """
+        Takes as input a d by d inverse covariance matrix S_inv
+        and returns a d-1 dimensional sub-covariance matrix
+        that is equivalent to having removed that dimension 
+        from the original data X before taking the inverse.
+        
+        See: http://www.cs.ubc.ca/~emtiyaz/Writings/OneColInv.pdf
+        
+        Parameters
+        ----------
+        col : int
+            which column to remove
+        
+        """
+        other_cols = np.array(list(range(0, col)) + list(range(col + 1, self.d)))
+        F = self.S_inv[np.ix_(other_cols,other_cols)]
+        sigma_squared = self.S_inv[col,col]
+        u = -self.S_inv[col,other_cols] / sigma_squared
+        S_inv_sub = F - sigma_squared*np.outer(u,u)
+        return S_inv_sub
 
-    def _check_missing_value_mask(self, missing):
-        if not missing.any():
-            raise ValueError("Input matrix is not missing any values")
-        if missing.all():
-            raise ValueError("Input matrix must have some non-missing values")
+    def _update_inverse_covariance(self,col):
+        """
+        Iterative update to inverse covariance matrix when only
+        one column is changed in X
+        
+        See: http://www.ini.ruhr-uni-bochum.de/uploads/document/attachment/107/SalmenEtAl_EfficientUpdateLda_PRL2010.pdf
+        Page 6
+        
+        Parameters
+        ----------
+        col : int
+            The index of the updated column
+        """
+        U = np.zeros((self.d,2))
+        updated_cov = np.dot(self.X_filled.T,self.X_filled[:,col])
+        U[:,0] = updated_cov - self.S[:,col]
+        U[col,1] = 1
+        V = np.zeros((2,self.d))
+        V[0,col] = 1
+        V[1,:] = U[:,0]
+        V[1,col] = 0 
+        prod_1 = np.dot(self.S_inv,U)
+        prod_2 = np.dot(V,self.S_inv)
+        inner_inv = np.linalg.inv(np.eye(2) + np.dot(prod_2,U))
+        self.S_inv -= np.dot(np.dot(prod_1,inner_inv),prod_2)
+        self.S[:,col] = updated_cov
+        self.S[col,:] = updated_cov
 
+        
     def _perform_imputation_round(self):
         """
         Does one entire round-robin set of updates.
         """
         for col in self.visit_indices:
             missing_mask_col = self.missing_mask[:, col]  # missing mask for this column
-            if sum(missing_mask_col) > 0:  # if we have any missing data at all
-                observed_mask_col = self.observed_mask[:, col]  # observed mask for this column
-                # the columns we will use to predict the current one
+            if self.verbose:
+                print("Column:",col)
+            if np.sum(missing_mask_col) > 0:  # if we have any missing data at all
+                observed_row_mask_for_col = self.observed_mask[:, col]  # observed mask for this column
+                # The other columns we will use to predict the current one
                 other_cols = np.array(list(range(0, col)) + list(range(col + 1, self.d)))
                 # only take rows for which we have observed vals for the current column
-                inputs = self.X_filled[observed_mask_col][:, other_cols]
-                output = self.X_filled[observed_mask_col, col]
-                # fit a ridge model
+                inputs = self.X_filled[np.ix_(observed_row_mask_for_col,other_cols)]
+                output = self.X_filled[observed_row_mask_for_col, col]
                 brr = self.model
-                brr.fit(inputs, output)
-                # now we split between the row method (PMM) and the column method
-                # note: for the column method, we could use other regressors
-                # but I am not sure how to do a posterior predictive draw in the arbitrary case
-                # and without this draw, the column algorithm doesn't work
+                # now we either use an approximate inverse
+                # or an exact one (slow updates)
+                if self.approximate_but_fast_mode:
+                    scaling_for_S_inv = len(observed_row_mask_for_col)/np.sum(observed_row_mask_for_col)
+                    S_inv_sub_est = scaling_for_S_inv * self._sub_inverse_covariance(col)
+                    brr.fit(inputs, output, inverse_covariance=S_inv_sub_est)
+                else:
+                    brr.fit(inputs, output, inverse_covariance=None)
+                    
+                # Now we choose the row method (PMM) or the column method.
                 if self.impute_type == 'row':  # this is the PMM procedure
                     # predict values for missing values using random beta draw
-                    X_missing = self.X_filled[missing_mask_col][:, other_cols]
+                    X_missing = self.X_filled[np.ix_(missing_mask_col,other_cols)]
                     col_preds_missing = brr.predict(X_missing, random_draw=True)
                     # predict values for observed values using best estimated beta
-                    X_observed = self.X_filled[observed_mask_col][:, other_cols]
+                    X_observed = self.X_filled[np.ix_(observed_row_mask_for_col,other_cols)]
                     col_preds_observed = brr.predict(X_observed, random_draw=False)
                     # for each missing value, find its nearest neighbors in the observed values
                     D = np.abs(col_preds_missing[:, np.newaxis] - col_preds_observed)  # distances
@@ -104,9 +207,9 @@ class MICE(Solver):
                     # set the missing values to be the values of the  nearest
                     # neighbor in the output space
                     self.X_filled[missing_mask_col, col] = \
-                        self.X_filled[observed_mask_col, col][NN_sampled]
+                        self.X_filled[observed_row_mask_for_col, col][NN_sampled]
                 elif self.impute_type == 'col':
-                    X_missing = self.X_filled[missing_mask_col][:, other_cols]
+                    X_missing = self.X_filled[np.ix_(missing_mask_col,other_cols)]
                     # predict values for missing values using posterior predictive draws
                     # see the end of this:
                     # https://www.cs.utah.edu/~fletcher/cs6957/lectures/BayesianLinearRegression.pdf
@@ -115,8 +218,12 @@ class MICE(Solver):
                     mus, sigmas_squared = brr.predict_dist(X_missing)
                     self.X_filled[missing_mask_col, col] = \
                         np.random.normal(mus, np.sqrt(sigmas_squared))
+                # now we update the covariance and inverse covariance matrices
+                if self.approximate_but_fast_mode:
+                    self._update_inverse_covariance(col)
 
-    def multiple_imputations(self, X, verbose=True):
+
+    def multiple_imputations(self, X):
         """
         Expects 2d float matrix with NaN entries signifying missing values
 
@@ -124,12 +231,14 @@ class MICE(Solver):
         of length self.n_imputations, and a mask that specifies where these values
         belong in X.
         """
-
+        
         self._check_input(X)
+        if self.add_ones:
+            X = np.column_stack((X, np.ones(X.shape[0])))
         self.missing_mask = np.isnan(X)
         self._check_missing_value_mask(self.missing_mask)
         self.observed_mask = ~self.missing_mask
-        self.d = X.shape[1]
+        self.n, self.d = X.shape
 
         # Decide what order we will update the columns.
         # As a homage to the MICE package, we will have 4 options of how to order the updates.
@@ -143,21 +252,30 @@ class MICE(Solver):
             self.visit_indices = np.argsort(self.missing_mask.sum(0))
         else:
             self.visit_indices = np.arange(self.d)
-
-        # Initialize the missing values by simple samling from the same column.
+        
+        # Initialize the missing values by simple sampling from the same column.
         # It's what Stef what do
         self.X_filled = X.copy()
         for col in self.visit_indices:
             missing_mask_col = self.missing_mask[:, col]
-            observed_mask_col = self.observed_mask[:, col]
-            observed_col = self.X_filled[observed_mask_col, col]
-            n_missing = sum(missing_mask_col)
-            self.X_filled[missing_mask_col, col] = np.random.choice(observed_col, n_missing)
+            if np.sum(missing_mask_col) > 0:
+                observed_row_mask_for_col = self.observed_mask[:, col]
+                observed_col = self.X_filled[observed_row_mask_for_col, col]
+                n_missing = np.sum(missing_mask_col)
+                self.X_filled[missing_mask_col, col] = np.random.choice(observed_col, n_missing)
 
+        # compute S and S_inv if not already computed
+        if self.S is None and self.approximate_but_fast_mode:
+            self.S = np.dot(self.X_filled.T, self.X_filled)
+            regularization_matrix = self.model.lambda_reg * np.eye(self.d)
+            if self.add_ones: # then don't regularize the offset
+                regularization_matrix[-1,-1] = 0 
+            self.S_inv = np.linalg.inv(self.S + regularization_matrix)
+            
         # now we jam up in the usual fashion for n_burn_in + n_imputations iterations
         self.X_filled_storage = []  # all of the imputed values, in a flattened format
         for m in range(self.n_burn_in + self.n_imputations):
-            if verbose:
+            if self.verbose:
                 print("Run:", m)
             self._perform_imputation_round()
             if m >= self.n_burn_in:
@@ -165,9 +283,8 @@ class MICE(Solver):
 
         return np.array(self.X_filled_storage), self.missing_mask
 
-    def complete(self, X, verbose=True):
-        X_multiple_imputations, missing_mask = self.multiple_imputations(
-            X, verbose)
+    def complete(self, X):
+        X_multiple_imputations, missing_mask = self.multiple_imputations(X)
         X_completed = X.copy()
         # average the imputed values for each feature
         X_completed[missing_mask] = X_multiple_imputations.mean(axis=0)

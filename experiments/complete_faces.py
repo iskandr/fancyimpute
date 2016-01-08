@@ -7,9 +7,9 @@ from sklearn.datasets import fetch_olivetti_faces
 import numpy as np
 
 from fancyimpute import (
-    AutoEncoder,
-    # MICE,
-    MatrixFactorization,
+    # AutoEncoder,
+    MICE,
+    # MatrixFactorization,
     # NuclearNormMinimization,
     SimpleFill,
     IterativeSVD,
@@ -182,7 +182,18 @@ if __name__ == "__main__":
     original = dataset.data
 
     table = ResultsTable(original)
-    """
+
+    for fill_method in ["mean", "median"]:
+        table.add_entry(
+            solver=SimpleFill(fill_method=fill_method),
+            name="SimpleFill_%s" % fill_method)
+
+    table.add_entry(
+        solver=MICE(
+            n_imputations=100,
+            approximate_but_fast_mode=True),
+        name="MICE")
+
     for k in [1, 3, 5]:
         table.add_entry(
             solver=DenseKNN(
@@ -196,9 +207,8 @@ if __name__ == "__main__":
             solver=SoftImpute(
                 shrinkage_value=shrinkage_value),
             name="SoftImpute_lambda%d" % (shrinkage_value,))
-    """
+
     for rank in [5, 50]:
-        """
         table.add_entry(
             solver=IterativeSVD(
                 rank=rank,
@@ -216,18 +226,13 @@ if __name__ == "__main__":
                 missing_input_noise_weight=0,
             ),
             name="AutoEncoder_rank%d" % (rank,))
-
         table.add_entry(
             solver=MatrixFactorization(
                 rank,
                 l1_penalty=0.1,
                 l2_penalty=0.1),
             name="MatrixFactorization_rank%d" % rank)
-
-    for fill_method in ["mean", "median"]:
-        table.add_entry(
-            solver=SimpleFill(fill_method=fill_method),
-            name="SimpleFill_%s" % fill_method)
+        """
 
     table.save_html_table()
     table.print_sorted_errors()
