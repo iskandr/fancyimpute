@@ -23,6 +23,36 @@ class MICE(Solver):
     Basic implementation of MICE from R.
     This version assumes all of the columns are continuous,
     and uses linear regression.
+    
+    Parameters
+    ----------
+    visit_sequence : str
+        Possible values: "monotone" (default), "roman", "arabic", "revmonotone".
+
+    n_imputations : int
+        Defaults to 100
+
+    n_burn_in : int
+        Defaults to 10
+
+    impute_type : str
+        "row" means classic PMM, "col" (default) means fill in linear preds.
+        
+    n_neighbors : int
+        Number of nearest neighbors for PMM, defaults to 5.
+
+    model : predictor function
+        A model that has fit, predict, and predict_dist methods.
+        Defaults to BayesianRidgeRegression(lambda_reg=1e-5)
+        
+    add_ones : boolean
+        Whether to add a constant column of ones. Defaults to True.
+        
+    approximate_but_fast_mode : Boolean
+        If True, uses linear algebra trickery to update the inverse covariance.
+        Defaults to False as it is not currently faster than brute force.
+        
+    verbose : boolean
     """
 
     def __init__(
@@ -40,16 +70,33 @@ class MICE(Solver):
         Parameters
         ----------
         visit_sequence : str
-            Possible values: "monotone", "roman", "arabic", "revmonotone"
-
+            Possible values: "monotone" (default), "roman", "arabic", "revmonotone".
+    
         n_imputations : int
-
+            Defaults to 100
+    
         n_burn_in : int
-
+            Defaults to 10
+    
         impute_type : str
-            "row" means classic pmm, "column" means fill in linear preds
+            "row" means classic PMM, "col" (default) means fill in linear preds.
+            
+        n_neighbors : int
+            Number of nearest neighbors for PMM, defaults to 5.
+    
+        model : predictor function
+            A model that has fit, predict, and predict_dist methods.
+            Defaults to BayesianRidgeRegression(lambda_reg=1e-5)
+            
+        add_ones : boolean
+            Whether to add a constant column of ones. Defaults to True.
+            
+        approximate_but_fast_mode : Boolean
+            If True, uses linear algebra trickery to update the inverse covariance.
+            Defaults to False as it is not currently faster than brute force.
+            
+        verbose : boolean
 
-        model : predictor
         """
         self.visit_sequence = visit_sequence
         self.n_imputations = n_imputations
@@ -131,14 +178,14 @@ class MICE(Solver):
                 inputs = self.X_filled[np.ix_(observed_row_mask_for_col,other_cols)]
                 output = self.X_filled[observed_row_mask_for_col, col]
                 brr = self.model
-                # now we either use an approximate inverse (fast updates)
+                # now we either use an approximate inverse
                 # or an exact one (slow updates)
                 if self.approximate_but_fast_mode:
                     scaling_for_S_inv = len(observed_row_mask_for_col)/np.sum(observed_row_mask_for_col)
                     S_inv_sub_est = scaling_for_S_inv * self._sub_inverse_covariance(col)
-                    brr.fit(inputs, output, S_inv_sub_est)
+                    brr.fit(inputs, output, inverse_covariance=S_inv_sub_est)
                 else:
-                    brr.fit(inputs, output)
+                    brr.fit(inputs, output, inverse_covariance=None)
                     
                 # Now we choose the row method (PMM) or the column method.
                 if self.impute_type == 'row':  # this is the PMM procedure

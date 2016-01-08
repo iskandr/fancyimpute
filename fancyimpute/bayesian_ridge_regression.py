@@ -27,11 +27,11 @@ class BayesianRidgeRegression(object):
             X_ones = X
         # first add a column of all ones to X
         n, d = X_ones.shape
-        # regularization matrix
-        regularization_matrix = self.lambda_reg * np.eye(d)
-        regularization_matrix[-1, -1] = 0  # don't need to regularize the intercept
         # the big expensive step when d is large
         if inverse_covariance is None:
+        # regularization matrix
+            regularization_matrix = self.lambda_reg * np.eye(d)
+            regularization_matrix[-1, -1] = 0  # don't need to regularize the intercept
             self.inverse_covariance = np.linalg.inv(
                 np.dot(X_ones.T, X_ones) + regularization_matrix)
         else:
