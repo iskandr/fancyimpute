@@ -180,13 +180,13 @@ if __name__ == "__main__":
             name="SimpleFill_%s" % fill_method)
 
     normalize_columns = True
-    
+    '''
     table.add_entry(
         solver=MICE(
             n_imputations=100,
             approximate_but_fast_mode=True),
         name="MICE")
-
+    '''
     for shrinkage_value in [25, 50, 100]:
         # SoftImpute without rank constraints
         table.add_entry(
