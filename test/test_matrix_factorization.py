@@ -8,8 +8,7 @@ def test_matrix_factorization_with_low_rank_random_matrix():
     solver = MatrixFactorization(
         rank=3,
         l1_penalty=0,
-        l2_penalty=0,
-        normalize_columns=False)
+        l2_penalty=0)
     XY_completed = solver.complete(XY_incomplete)
     _, missing_mae = reconstruction_error(
         XY,
