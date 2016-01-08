@@ -189,13 +189,10 @@ class MICE(Solver):
         observed_mask = ~missing_mask
         for col_idx in visit_indices:
             missing_mask_col = missing_mask[:, col_idx]  # missing mask for this column
-            n_missing = missing_mask_col.sum()
-            # n_observed = n_rows - n_missing
-            if self.verbose:
-                print("Imputing values for column %d with %d missing values" % (
-                    col_idx,
-                    n_missing))
-            if n_missing > 0:  # if we have any missing data at all
+            n_missing_for_this_col = missing_mask_col.sum()
+            if n_missing_for_this_col > 0:  # if we have any missing data at all
+                n_observed_for_this_col = n_rows - n_missing_for_this_col
+
                 observed_row_mask_for_col = observed_mask[:, col_idx]
                 # The other columns we will use to predict the current one
                 other_cols = np.array(list(range(0, col_idx)) + list(range(col_idx + 1, n_cols)))
@@ -206,7 +203,7 @@ class MICE(Solver):
                 # now we either use an approximate inverse
                 # or an exact one (slow updates)
                 if self.approximate_but_fast_mode:
-                    scaling_for_S_inv = n_rows / observed_row_mask_for_col.sum()
+                    scaling_for_S_inv = n_rows / n_observed_for_this_col
                     S_inv_slice = self._sub_inverse_covariance(S_inv, col_idx)
                     S_inv_sub_est = scaling_for_S_inv * S_inv_slice
                     brr.fit(inputs, output, inverse_covariance=S_inv_sub_est)
@@ -239,7 +236,7 @@ class MICE(Solver):
                     # predict values for missing values using posterior predictive draws
                     # see the end of this:
                     # https://www.cs.utah.edu/~fletcher/cs6957/lectures/BayesianLinearRegression.pdf
-                    # self.X_filled[missing_mask_col,col] = \
+                    # X_filled[missing_mask_col,col] = \
                     #   brr.posterior_predictive_draw(X_missing)
                     mus, sigmas_squared = brr.predict_dist(X_missing)
                     X_filled[missing_mask_col, col_idx] = \
@@ -297,12 +294,18 @@ class MICE(Solver):
         """
 
         self._check_input(X)
-        if self.add_ones:
-            X = np.column_stack((X, np.ones(X.shape[0])))
         missing_mask = np.isnan(X)
         self._check_missing_value_mask(missing_mask)
         visit_indices = self.get_visit_indices(missing_mask)
-        n_rows, n_cols = X.shape
+        n_rows = len(X)
+        if self.add_ones:
+            X = np.column_stack((X, np.ones(n_rows)))
+            missing_mask = np.column_stack([
+                missing_mask,
+                np.zeros(n_rows, dtype=missing_mask.dtype)
+            ])
+        n_cols = X.shape[1]
+
         X_filled = self.initialize(
             X,
             missing_mask=missing_mask,
@@ -310,11 +313,11 @@ class MICE(Solver):
 
         # compute S and S_inv if required
         if self.approximate_but_fast_mode:
-            S = np.dot(self.X_filled.T, self.X_filled)
+            S = np.dot(X_filled.T, X_filled)
             regularization_matrix = self.model.lambda_reg * np.eye(n_cols)
             if self.add_ones:  # then don't regularize the offset
                 regularization_matrix[-1, -1] = 0
-            S_inv = np.linalg.inv(self.S + regularization_matrix)
+            S_inv = np.linalg.inv(S + regularization_matrix)
         else:
             S = S_inv = None
 
@@ -324,7 +327,8 @@ class MICE(Solver):
 
         for m in range(total_rounds):
             if self.verbose:
-                print("[MICE] Imputation round %d/%d:" % (m + 1, total_rounds))
+                print("[MICE] Imputation round %d/%d:" % (
+                    m + 1, total_rounds))
             X_filled = self.perform_imputation_round(
                 X_filled=X_filled,
                 missing_mask=missing_mask,
@@ -333,12 +337,15 @@ class MICE(Solver):
                 S_inv=S_inv)
             if m >= self.n_burn_in:
                 results_list.append(X_filled[missing_mask])
-
+        if self.add_ones:
+            # chop off the missing mask corresponding to the constant ones
+            missing_mask = missing_mask[:, :-1]
         return np.array(results_list), missing_mask
 
     def complete(self, X):
-        X_multiple_imputations, missing_mask = self.multiple_imputations(X)
         X_completed = X.copy()
+        imputed_arrays, missing_mask = self.multiple_imputations(X)
         # average the imputed values for each feature
-        X_completed[missing_mask] = X_multiple_imputations.mean(axis=0)
+        average_imputated_values = imputed_arrays.mean(axis=0)
+        X_completed[missing_mask] = average_imputated_values
         return X_completed
