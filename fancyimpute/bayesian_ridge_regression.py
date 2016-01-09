@@ -59,16 +59,18 @@ class BayesianRidgeRegression(object):
         else:
             return np.column_stack((X, np.ones(X.shape[0])))
 
-    # random draws work as follows
+    # Random draws from the posterior over beta coefficients
     # reference: https://www.cs.utah.edu/~fletcher/cs6957/lectures/BayesianLinearRegression.pdf
-    # bottom of page 1
-    # note that the pros do wackier stuff: https://github.com/jwb133/smcfcs/blob/master/R/smcfcs.r
-    # see lines 363 to 365. not sure what exactly is happening here
+    # page 1
+    # note that the pros something different: 
+    # https://github.com/stefvanbuuren/mice/blob/master/R/mice.impute.norm.r
     def random_beta_draw(self, num_draws=1):
         covar = self.sigma_squared_estimate * self.inverse_covariance
         return np.random.multivariate_normal(self.beta_estimate, covar, num_draws)
 
-    # posterior predictive draw
+    # Returns the mean and variance of the posterior predictive distribution
+    # Reference: https://www.cs.utah.edu/~fletcher/cs6957/lectures/BayesianLinearRegression.pdf
+    # page 2
     def predict_dist(self, X):
         if self.add_ones:
             X_ones = self.add_column_of_ones(X) 

@@ -174,6 +174,7 @@ class MICE(Solver):
         S_inv -= np.dot(np.dot(prod_1, inner_inv), prod_2)
         S[:, col_idx] = updated_cov
         S[col_idx, :] = updated_cov
+        return S,S_inv
 
     def perform_imputation_round(
             self,
@@ -243,12 +244,12 @@ class MICE(Solver):
                         np.random.normal(mus, np.sqrt(sigmas_squared))
                 # now we update the covariance and inverse covariance matrices
                 if self.approximate_but_fast_mode:
-                    self._update_inverse_covariance(
+                    S, S_inv = self._update_inverse_covariance(
                         X_filled=X_filled,
                         S=S,
                         S_inv=S_inv,
                         col_idx=col_idx)
-        return X_filled
+        return X_filled, S, S_inv
 
     def initialize(self, X, missing_mask, visit_indices):
         """
@@ -329,7 +330,7 @@ class MICE(Solver):
             if self.verbose:
                 print("[MICE] Imputation round %d/%d:" % (
                     m + 1, total_rounds))
-            X_filled = self.perform_imputation_round(
+            X_filled, S, S_inv = self.perform_imputation_round(
                 X_filled=X_filled,
                 missing_mask=missing_mask,
                 visit_indices=visit_indices,
