@@ -174,7 +174,7 @@ class MICE(Solver):
         S_inv -= np.dot(np.dot(prod_1, inner_inv), prod_2)
         S[:, col_idx] = updated_cov
         S[col_idx, :] = updated_cov
-        return S,S_inv
+        return S, S_inv
 
     def perform_imputation_round(
             self,

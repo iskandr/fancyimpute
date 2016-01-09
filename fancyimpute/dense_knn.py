@@ -71,7 +71,6 @@ class DenseKNN(Solver):
             for i in range(n_rows)
         ]
         for i in range(n_rows):
-
             if self.verbose and i % 100 == 0:
                 print(
                     "[DenseKNN] Imputing row %d/%d with %d missing columns" % (
