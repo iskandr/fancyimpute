@@ -38,7 +38,7 @@ class MICE(Solver):
     impute_type : str
         "row" means classic PMM, "col" (default) means fill in linear preds.
 
-    n_neighbors : int
+    n_pmm_neighbors : int
         Number of nearest neighbors for PMM, defaults to 5.
 
     model : predictor function
@@ -64,7 +64,7 @@ class MICE(Solver):
             visit_sequence='monotone',  # order in which we visit the columns
             n_imputations=100,
             n_burn_in=10,  # this many replicates will be thrown away
-            n_neighbors=5,  # number of nearest neighbors in PMM
+            n_pmm_neighbors=5,  # number of nearest neighbors in PMM
             impute_type='col', # also can be pmm
             model=BayesianRidgeRegression(lambda_reg=0.001),
             add_ones=True,
@@ -88,7 +88,7 @@ class MICE(Solver):
             "col" (default) means fill in with samples from posterior predictive
                 distribution.
 
-        n_neighbors : int
+        n_pmm_neighbors : int
             Number of nearest neighbors for PMM, defaults to 5.
 
         model : predictor function
@@ -111,7 +111,7 @@ class MICE(Solver):
         self.visit_sequence = visit_sequence
         self.n_imputations = n_imputations
         self.n_burn_in = n_burn_in
-        self.n_neighbors = n_neighbors
+        self.n_pmm_neighbors = n_pmm_neighbors
         self.impute_type = impute_type
         self.model = model
         self.add_ones = add_ones
@@ -174,13 +174,11 @@ class MICE(Solver):
                     # for each missing value, find its nearest neighbors in the observed values
                     D = np.abs(col_preds_missing[:, np.newaxis] - col_preds_observed)  # distances
                     # take top k neighbors
-                    k = np.minimum(self.n_neighbors, len(col_preds_observed) - 1)
-
+                    k = np.minimum(self.n_pmm_neighbors, len(col_preds_observed) - 1)
                     NN = np.argpartition(D, k, 1)[:, :k]  # <- bottleneck!
-                    # pick one of the 5 nearest neighbors at random! that's right!
-                    # not even an average
+                    # pick one of the nearest neighbors at random! that's right!
                     NN_sampled = [np.random.choice(NN_row) for NN_row in NN]
-                    # set the missing values to be the values of the  nearest
+                    # set the missing values to be the values of the nearest
                     # neighbor in the output space
                     X_filled[missing_mask_col, col_idx] = \
                         X_filled[observed_row_mask_for_col, col_idx][NN_sampled]
