@@ -16,10 +16,15 @@ import numpy as np
 
 
 class BayesianRidgeRegression(object):
-    def __init__(self, lambda_reg=1e-5,add_ones=False):
+    """
+    Bayesian Ridge Regression
+    
+    """
+    def __init__(self, lambda_reg=1e-5,add_ones=False,normalize_lambda=True):
         self.lambda_reg = lambda_reg
         self.add_ones = add_ones
-
+        self.normalize_lambda = normalize_lambda
+    
     def fit(self, X, y, inverse_covariance=None):
         if self.add_ones:
             X_ones = self.add_column_of_ones(X)
@@ -29,15 +34,20 @@ class BayesianRidgeRegression(object):
         n, d = X_ones.shape
         # the big expensive step when d is large
         if inverse_covariance is None:
-        # regularization matrix
-            regularization_matrix = self.lambda_reg * np.eye(d)
+            outer_product = np.dot(X_ones.T, X_ones)
+            if self.normalize_lambda:
+                lambda_reg = self.lambda_reg * np.linalg.norm(outer_product)
+    
+            else:
+                lambda_reg = self.lambda_reg
+            regularization_matrix = lambda_reg * np.eye(d)
             regularization_matrix[-1, -1] = 0  # don't need to regularize the intercept
             self.inverse_covariance = np.linalg.inv(
-                np.dot(X_ones.T, X_ones) + regularization_matrix)
+               outer_product + regularization_matrix)
         else:
             self.inverse_covariance = inverse_covariance
         # estimate of the parameters
-        self.beta_estimate = np.dot(np.dot(self.inverse_covariance, X_ones.T), y)
+        self.beta_estimate = np.dot(np.dot(self.inverse_covariance, X_ones.T), y)        
         # now we need the estimate of the noise variance
         # reference: https://stat.ethz.ch/R-manual/R-devel/library/stats/html/summary.lm.html
         residuals_sqr = (y - self.predict(X)) ** 2

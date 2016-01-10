@@ -16,12 +16,15 @@ def test_brr_like_sklearn():
     #  y_ts = y[n / 2:]
 
     # prediction with my own bayesian ridge
-    brr = BayesianRidgeRegression(1e-5)
+    lambda_reg = 1
+    brr = BayesianRidgeRegression(lambda_reg,
+                                  add_ones=True,
+                                  normalize_lambda=False)
     brr.fit(X_tr, y_tr)
     y_ts_brr = brr.predict(X_ts)
 
     # let's compare to scikit-learn's ridge regression
-    rr = Ridge(1e-5)
+    rr = Ridge(lambda_reg)
     rr.fit(X_tr, y_tr)
     y_ts_rr = rr.predict(X_ts)
 
