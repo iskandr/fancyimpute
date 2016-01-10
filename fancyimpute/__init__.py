@@ -12,6 +12,7 @@ from .simple_fill import SimpleFill
 from .soft_impute import SoftImpute
 from .biscaler import BiScaler
 from .dense_knn import DenseKNN
+from .knn_helpers import all_pairs_normalized_distances
 
 __all__ = [
     "NuclearNormMinimization",
@@ -27,4 +28,5 @@ __all__ = [
     "neuralnet_helpers",
     "BiScaler",
     "DenseKNN",
+    "all_pairs_normalized_distances",
 ]

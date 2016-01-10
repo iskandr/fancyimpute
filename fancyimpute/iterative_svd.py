@@ -21,8 +21,8 @@ class IterativeSVD(Solver):
     def __init__(
             self,
             rank,
+            convergence_threshold=0.0001,
             max_iters=100,
-            convergence_threshold=0.001,
             gradual_rank_increase=True,
             svd_algorithm="arpack",
             init_fill_method="zero",

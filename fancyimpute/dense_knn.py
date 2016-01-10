@@ -12,8 +12,10 @@
 
 from six.moves import range
 import numpy as np
+import time
 
 from .solver import Solver
+from .knn_helpers import all_pairs_normalized_distances
 
 
 class DenseKNN(Solver):
@@ -30,71 +32,116 @@ class DenseKNN(Solver):
         self.verbose = verbose
         self.orientation = orientation
 
-    def _compute_distances(self, X):
-        n_samples, n_cols = X.shape
-
-        if self.verbose:
-            print("[DenseKNN] Computing pairwise distances between %d samples" % (
-                n_samples))
-        # matrix of mean squared difference between between samples
-        D = np.zeros((n_samples, n_samples), dtype="float32")
-        for i in range(n_samples):
-            x = X[i, :]
-            diffs = X - x.reshape((1, n_cols))
-            observed = np.isfinite(diffs)
-            observed_counts_per_row = observed.sum(axis=1)
-            valid_rows = observed_counts_per_row > 0
-            D[i, ~valid_rows] = np.inf
-            if valid_rows.sum() == 0:
-                print("No samples have sufficient overlap with sample %d" % (
-                    i,))
-            else:
-                D[i, valid_rows] = np.nanmean(
-                    diffs[valid_rows, :] ** 2,
-                    axis=1)
-        return D
-
     def solve(self, X, missing_mask):
+        start_t = time.time()
         if self.orientation == "columns":
-            X = np.asarray(X.T, order="F")
-            missing_mask = np.asarray(missing_mask.T, order="F")
+            X = X.T
+            missing_mask = missing_mask.T
         elif self.orientation != "rows":
             raise ValueError(
                 "Orientation must be either 'rows' or 'columns', got: %s" % (
                     self.orientation,))
-        X_with_nans = X.copy()
+        X_with_nans = X.copy(order="C")
         X_with_nans[missing_mask] = np.nan
-        D = self._compute_distances(X_with_nans)
+        X_with_nans_column_major = np.asarray(X_with_nans, order="F")
+
+        D = all_pairs_normalized_distances(X_with_nans, verbose=self.verbose)
+        D_sorted_indices = np.argsort(D, axis=1)
         n_rows = X.shape[0]
-        missing_indices = [
+        missing_columns_for_each_row = [
             np.where(missing_mask[i])[0]
             for i in range(n_rows)
         ]
+        k = self.k
+        dot = np.dot
+
+        # preallocate array to prevent repeated creation in the following loops
+        neighbor_weights = np.ones(k, dtype=X.dtype)
+
+        missing_mask_column_major = np.asarray(missing_mask, order="F")
+        observed_mask_column_major = ~missing_mask_column_major
+
         for i in range(n_rows):
+            missing_columns = missing_columns_for_each_row[i]
             if self.verbose and i % 100 == 0:
                 print(
-                    "[DenseKNN] Imputing row %d/%d with %d missing columns" % (
-                        i,
+                    "[DenseKNN] Imputing row %d/%d with %d missing columns, elapsed time: %0.3f" % (
+                        i + 1,
                         n_rows,
-                        len(missing_indices[i]),))
-            d = D[i, :]
-            for j in missing_indices[i]:
-                column = X[:, j]
-                rows_missing_feature = missing_mask[:, j]
-                d_valid = d.copy()
-                d_valid[rows_missing_feature] = np.inf
-                sorted_indices = np.argsort(d_valid)
-                neighbor_indices = sorted_indices[:self.k]
-                neighbor_dists = d[neighbor_indices]
-                # make sure no infininities snuck in
-                sane_dist = np.isfinite(neighbor_dists)
-                neighbor_indices = neighbor_indices[sane_dist]
-                neighbor_dists = neighbor_dists[sane_dist]
-                neighbor_weights = 1.0 / neighbor_dists
-                X[i, j] = (
-                    (column[neighbor_indices] * neighbor_weights).sum() /
+                        len(missing_columns),
+                        time.time() - start_t))
+            row_distances = D[i, :]
+            missing_columns = missing_columns_for_each_row[i]
+            n_missing_columns = len(missing_columns)
+            neighbor_indices = D_sorted_indices[i, :]
+            X_missing_columns = X_with_nans_column_major[:, missing_columns]
+
+            # precompute these for the fast path where the k nearest neighbors
+            # are not missing the feature value we're currently trying to impute
+            k_nearest_indices = neighbor_indices[:k]
+            np.divide(1.0, row_distances[k_nearest_indices], out=neighbor_weights)
+            # optimistically impute all the columns from the k nearest neighbors
+            # we'll have to back-track for some of the columns for which
+            # one of the neighbors did not have a value
+            X_knn = X_missing_columns[k_nearest_indices, :]
+            weighted_average_of_neighboring_rows = dot(
+                X_knn.T,
+                neighbor_weights)
+            sum_weights = neighbor_weights.sum()
+            weighted_average_of_neighboring_rows /= sum_weights
+            imputed_values = weighted_average_of_neighboring_rows
+
+            observed_mask_missing_columns = observed_mask_column_major[:, missing_columns]
+            observed_mask_missing_columns_sorted = observed_mask_missing_columns[
+                neighbor_indices, :]
+
+            # We can determine the maximum number of other rows that must be
+            # inspected across all features missing for this row by
+            # looking at the column-wise running sums of the observed feature
+            # matrix.
+            observed_cumulative_sum = observed_mask_missing_columns_sorted.cumsum(axis=0)
+            sufficient_rows = (observed_cumulative_sum == k)
+            n_rows_needed = sufficient_rows.argmax(axis=0) + 1
+            max_rows_needed = n_rows_needed.max()
+
+            if max_rows_needed == k:
+                # if we never needed more than k rows then we're done after the
+                # optimistic averaging above, so go on to the next sample
+                X[i, missing_columns] = imputed_values
+                continue
+
+            # truncate all the sorted arrays to only include the necessary
+            # number of rows (should significantly speed up the "slow" path)
+            necessary_indices = neighbor_indices[:max_rows_needed]
+            d_sorted = row_distances[necessary_indices]
+            X_missing_columns_sorted = X_missing_columns[necessary_indices, :]
+            observed_mask_missing_columns_sorted = observed_mask_missing_columns_sorted[
+                :max_rows_needed, :]
+
+            for missing_column_idx in range(n_missing_columns):
+                # since all the arrays we're looking into have already been
+                # sliced out at the missing features, we need to address these
+                # features from 0..n_missing using missing_idx rather than j
+                if n_rows_needed[missing_column_idx] == k:
+                    assert np.isfinite(imputed_values[missing_column_idx]), \
+                        "Expected finite imputed value #%d (column #%d for row %d)" % (
+                            missing_column_idx,
+                            missing_columns[missing_column_idx],
+                            i)
+                    continue
+                row_mask = observed_mask_missing_columns_sorted[:, missing_column_idx]
+                sorted_column_values = X_missing_columns_sorted[:, missing_column_idx]
+                neighbor_values = sorted_column_values[row_mask][:k]
+                neighbor_distances = d_sorted[row_mask][:k]
+                np.divide(1.0, neighbor_distances, out=neighbor_weights)
+                imputed_values[missing_column_idx] = (
+                    dot(neighbor_values, neighbor_weights) /
                     neighbor_weights.sum()
                 )
+            X[i, missing_columns] = imputed_values
         if self.orientation == "columns":
             X = X.T
+        n_missing_after_imputation = np.isnan(X).sum()
+        assert n_missing_after_imputation == 0, \
+            "Expected all values to be filled but got %d missing" % (n_missing_after_imputation,)
         return X

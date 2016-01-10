@@ -17,7 +17,8 @@ Helper functions for incomplete matrices represented using dictionaries.
 from collections import defaultdict
 
 from scipy.sparse import dok_matrix
-import numpy as np
+
+from .common import dense_nan_matrix
 
 
 def collect_nested_keys(nested_dict):
@@ -104,10 +105,6 @@ def sparse_dok_matrix_from_nested_dictionary(
         square_result=square_result)
 
 
-def dense_nan_matrix(shape, dtype):
-    return np.ones(shape, dtype=dtype) * np.nan
-
-
 def dense_matrix_from_nested_dictionary(
         nested_dict,
         dtype="float32",
@@ -182,7 +179,7 @@ def pair_dict_key_sets(pair_dict):
     return row_keys, column_keys
 
 
-def array_from_pair_dict(
+def array_from_pair_dictionary(
         pair_dict,
         array_fn,
         dtype="float32",
@@ -227,3 +224,25 @@ def array_from_pair_dict(
         j = column_key_indices[column_keys]
         result[i, j] = value
     return result, row_key_indices, column_key_indices
+
+
+def sparse_dok_matrix_from_pair_dictionary(
+        pair_dict,
+        dtype="float32",
+        square_result=False):
+    return array_from_pair_dictionary(
+        pair_dict,
+        array_fn=dok_matrix,
+        dtype=dtype,
+        square_result=square_result)
+
+
+def dense_matrix_from_pair_dictionary(
+        pair_dict,
+        dtype="float32",
+        square_result=False):
+    return array_from_pair_dictionary(
+        pair_dict,
+        array_fn=dense_nan_matrix,
+        dtype=dtype,
+        square_result=square_result)
