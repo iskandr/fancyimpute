@@ -5,20 +5,34 @@ A variety of matrix completion and imputation algorithms implemented in Python.
 ## Usage
 
 ```python
+from fancyimpute import (NuclearNormMinimization, BiScaler, DenseKNN)
 
-from fancyimpute import NuclearNormMinimization
+biscaler = BiScaler()
 
-solver = NuclearNormMinimization(
-    min_value=0.0,
-    max_value=1.0,
-    error_tolerance=0.0005)
+# X is a data matrix which we're going to randomly drop entries from
+missing_mask = np.random.randn(*X.shape) > 0
+X_incomplete = X.copy()
+# missing entries indicated with NaN
+X_incomplete[missing_mask] = np.nan
 
-# X_incomplete has missing data which is represented with NaN values
-X_filled = solver.complete(X_incomplete)
+# rescale both rows and columns to have zero mean and unit variance
+X_incomplete_normalized = BiScaler.fit_transform(X_incomplete)
+
+# use 3 nearest rows which have a feature to fill in each row's missing features
+knn_solver = DenseKNN(k=3)
+X_filled_normalized = knn_solver.complete(X_incomplete)
+X_filled = biscaler.inverse_transform(X_knn_normalized)
+
+mse = ((X_filled[missing_mask] - X[missing_mask]) ** 2).mean()
+print("MSE of reconstruction: %f" % mse)
 ```
+
 ## Algorithms
 
 * `SimpleFill`: Replaces missing entries with the mean or median of each column.
+
+* `DenseKNN`: Nearest neighbor imputations which weights samples using the mean squared difference
+on features for which two rows both have observed data.
 
 * `SoftImpute`: Matrix completion by iterative soft thresholding of SVD decompositions. Inspired by the [softImpute](https://web.stanford.edu/~hastie/swData/softImpute/vignette.html) package for R, which is based on [Spectral Regularization Algorithms for Learning Large Incomplete Matrices](http://web.stanford.edu/~hastie/Papers/mazumder10a.pdf) by Mazumder et. al.
 
@@ -30,4 +44,7 @@ X_filled = solver.complete(X_incomplete)
 
 * `NuclearNormMinimization`: Simple implementation of [Exact Matrix Completion via Convex Optimization](http://statweb.stanford.edu/~candes/papers/MatrixCompletion.pdf
 ) by Emmanuel Candes and Benjamin Recht using [cvxpy](http://www.cvxpy.org/en/latest/). Too slow for large matrices.
+
+* `BiScaler`: Iterative estimation of row/column means and standard deviations to get doubly normalized
+matrix. Not guaranteed to converge but works well in practice. Taken from [Matrix Completion and Low-Rank SVD via Fast Alternating Least Squares](http://arxiv.org/abs/1410.2596).
 

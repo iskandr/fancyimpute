@@ -151,6 +151,7 @@ class BiScaler(object):
         row_variances = np.nanmean(
             X_centered ** 2 / (column_scales ** 2).reshape((1, n_cols)),
             axis=1)
+        row_variances[row_variances == 0] = 1.0
         assert len(row_variances) == n_rows
         return np.sqrt(row_variances)
 
@@ -176,6 +177,7 @@ class BiScaler(object):
         column_variances = np.nanmean(
             X_centered ** 2 / (row_scales ** 2).reshape((n_rows, 1)),
             axis=0)
+        column_variances[column_variances == 0] = 1.0
         assert len(column_variances) == n_cols
         return np.sqrt(column_variances)
 
@@ -184,14 +186,17 @@ class BiScaler(object):
         if self.center_rows:
             row_means = np.nanmean(X_normalized, axis=1)
             total += (row_means ** 2).sum()
+
         if self.center_columns:
             column_means = np.nanmean(X_normalized, axis=0)
             total += (column_means ** 2).sum()
         if self.scale_rows:
             row_variances = np.nanvar(X_normalized, axis=1)
+            row_variances[row_variances == 0] = 1.0
             total += (np.log(row_variances) ** 2).sum()
         if self.scale_columns:
             column_variances = np.nanvar(X_normalized, axis=0)
+            column_variances[column_variances == 0] = 1.0
             total += (np.log(column_variances) ** 2).sum()
         return total
 
@@ -216,8 +221,18 @@ class BiScaler(object):
         X_column_major = np.asarray(X, order="F")
 
         observed_row_major = ~np.isnan(X_row_major)
-        observed_column_major = np.asarray(observed_row_major, order="F")
+        n_observed_per_row = observed_row_major.sum(axis=1)
+        n_empty_rows = (n_observed_per_row == 0).sum()
 
+        if n_empty_rows > 0:
+            raise ValueError("%d rows have no observed values" % n_empty_rows)
+
+        observed_column_major = np.asarray(observed_row_major, order="F")
+        n_observed_per_column = observed_column_major.sum(axis=0)
+        n_empty_columns = (n_observed_per_column == 0).sum()
+        if n_empty_columns > 0:
+            raise ValueError("%d columns have no observed values" % (
+                n_empty_columns,))
         # initialize by assuming that rows are zero-mean/unit variance and
         # with a direct estimate of mean and standard deviation
         # of each column
@@ -231,11 +246,14 @@ class BiScaler(object):
 
         if self.scale_columns:
             column_scales = np.nanstd(X, axis=0)
+            column_scales[column_scales == 0] = 1.0
         else:
             column_scales = np.ones(n_rows, dtype=dtype)
 
         last_residual = self.residual(X)
-
+        if self.verbose:
+            print("[BiScaler] Initial log residual value = %f" % (
+                np.log(last_residual),))
         for i in range(self.max_iters):
             assert len(column_means) == n_cols
             assert len(column_scales) == n_cols
@@ -254,6 +272,7 @@ class BiScaler(object):
                     observed=observed_column_major,
                     row_means=row_means,
                     row_scales=row_scales)
+
             X_centered = self.center(
                 X,
                 row_means,
@@ -266,14 +285,15 @@ class BiScaler(object):
                 column_scales = self.estimate_column_scales(
                     X_centered=X_centered,
                     row_scales=row_scales)
+
             X_normalized = self.rescale(X_centered, row_scales, column_scales)
             residual = self.residual(X_normalized)
             change_in_residual = last_residual - residual
             if self.verbose:
-                print("[BiScaler] Iter %d: log residual = %f, ratio=%f" % (
+                print("[BiScaler] Iter %d: log residual = %f, log improvement ratio=%f" % (
                     i + 1,
                     np.log(residual),
-                    change_in_residual / last_residual))
+                    np.log(last_residual / residual)))
             if change_in_residual / last_residual < self.tolerance:
                 break
             last_residual = residual

@@ -38,8 +38,8 @@ class SoftImpute(Solver):
     def __init__(
             self,
             shrinkage_value=None,
-            convergence_threshold=0.00001,
-            max_iters=200,
+            convergence_threshold=0.0001,
+            max_iters=100,
             max_rank=None,
             n_power_iterations=1,
             init_fill_method="zero",

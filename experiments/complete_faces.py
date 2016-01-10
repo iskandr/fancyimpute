@@ -3,14 +3,10 @@ from os.path import exists, join
 from collections import defaultdict
 
 import pylab
-from sklearn.datasets import fetch_olivetti_faces
+from sklearn.datasets import fetch_lfw_people
 import numpy as np
 
 from fancyimpute import (
-    # AutoEncoder,
-    MICE,
-    # MatrixFactorization,
-    # NuclearNormMinimization,
     SimpleFill,
     IterativeSVD,
     SoftImpute,
@@ -22,16 +18,14 @@ from fancyimpute.common import masked_mae, masked_mse
 
 def remove_pixels(
         full_images,
-        width=64,
-        height=64,
         missing_square_size=32,
         random_seed=0):
     np.random.seed(random_seed)
     incomplete_faces = []
-    n_faces, n_pixels = full_images.shape
-    assert n_pixels == width * height
+    n_faces = len(full_images)
+    height, width = full_images[0].shape[:2]
     for i in range(n_faces):
-        image = full_images[i].reshape((height, width)).copy()
+        image = full_images[i].copy()
         start_x = np.random.randint(
             low=0,
             high=height - missing_square_size + 1)
@@ -39,39 +33,97 @@ def remove_pixels(
             low=0,
             high=width - missing_square_size + 1)
         image[
-            start_x:start_x + missing_square_size,
-            start_y:start_y + missing_square_size] = np.nan
-        incomplete_faces.append(image.reshape((n_pixels,)))
-    incomplete_faces_matrix = np.array(incomplete_faces, dtype=np.float32)
-    return incomplete_faces_matrix
+            start_x: start_x + missing_square_size,
+            start_y: start_y + missing_square_size] = np.nan
+        incomplete_faces.append(image)
+    return np.array(incomplete_faces, dtype=np.float32)
+
+
+def rescale_pixel_values(images, order="C"):
+    """
+    Rescale the range of values in images to be between [0, 1]
+    """
+    images = np.asarray(images, order=order).astype("float32")
+    images -= images.min()
+    images /= images.max()
+    return images
+
+
+def color_balance(images):
+    images = images.astype("float32")
+    red = images[:, :, :, 0]
+    green = images[:, :, :, 1]
+    blue = images[:, :, :, 2]
+    combined = (red + green + blue)
+    total_color = combined.sum()
+    overall_fraction_red = red.sum() / total_color
+    overall_fraction_green = green.sum() / total_color
+    overall_fraction_blue = blue.sum() / total_color
+
+    for i in range(images.shape[0]):
+        image = images[i]
+        image_total = combined[i].sum()
+        red_scale = overall_fraction_red / (red[i].sum() / image_total)
+        green_scale = overall_fraction_green / (green[i].sum() / image_total)
+        blue_scale = overall_fraction_blue / (blue[i].sum() / image_total)
+        image[:, :, 0] *= red_scale
+        image[:, :, 1] *= green_scale
+        image[:, :, 2] *= blue_scale
+    image[image < 0] = 0
+    image[image > 255] = 255
+    return images
 
 
 class ResultsTable(object):
 
     def __init__(
             self,
-            images,
-            width=64,
-            height=64,
-            missing_square_size=25,
-            saved_image_stride=75,
-            dirname="face_images"):
-        self.original = self.rescale_pixel_values(images)
+            images_dict,
+            percent_missing=0.25,
+            saved_image_stride=125,
+            dirname="face_images",
+            scale_rows=False,
+            center_rows=False):
+        self.images_dict = images_dict
+        self.labels = list(sorted(images_dict.keys()))
+        self.images_array = np.array(
+            [images_dict[k] for k in self.labels]).astype("float32")
+        self.image_shape = self.images_array[0].shape
+        self.width, self.height = self.image_shape[:2]
+        self.color = (len(self.image_shape) == 3) and (self.image_shape[2] == 3)
+        if self.color:
+            self.images_array = color_balance(self.images_array)
+        self.n_pixels = self.width * self.height
+        self.n_features = self.n_pixels * (3 if self.color else 1)
+        self.n_images = len(self.images_array)
+        print("[ResultsTable] # images = %d, color=%s # features = %d, shape = %s" % (
+            self.n_images, self.color, self.n_features, self.image_shape))
 
-        self.width = width
-        self.height = height
-        assert images.shape[1] == width * height
-        self.incomplete = remove_pixels(
-            images,
-            width=width,
-            height=height,
+        self.flattened_array_shape = (self.n_images, self.n_features)
+
+        self.flattened_images = self.images_array.reshape(self.flattened_array_shape)
+
+        n_missing_pixels = int(self.n_pixels * percent_missing)
+
+        missing_square_size = int(np.sqrt(n_missing_pixels))
+        print("[ResultsTable] n_missing_pixels = %d, missing_square_size = %d" % (
+            n_missing_pixels, missing_square_size))
+        self.incomplete_images = remove_pixels(
+            self.images_array,
             missing_square_size=missing_square_size)
-        self.missing_mask = np.isnan(self.incomplete)
-        self.normalizer = BiScaler(scale_rows=False, min_value=0, max_value=1)
+        print("[ResultsTable] Incomplete images shape = %s" % (
+            self.incomplete_images.shape,))
+        self.flattened_incomplete_images = self.incomplete_images.reshape(
+            self.flattened_array_shape)
+        self.missing_mask = np.isnan(self.flattened_incomplete_images)
+        self.normalizer = BiScaler(
+            scale_rows=scale_rows,
+            center_rows=center_rows,
+            min_value=self.images_array.min(),
+            max_value=self.images_array.max())
         self.incomplete_normalized = self.normalizer.fit_transform(
-            self.incomplete)
+            self.flattened_incomplete_images)
 
-        self.n_images = len(original)
         self.saved_image_indices = list(
             range(0, self.n_images, saved_image_stride))
         self.saved_images = defaultdict(dict)
@@ -79,37 +131,36 @@ class ResultsTable(object):
         self.mse_dict = {}
         self.mae_dict = {}
 
-        self.save_images(self.original, "original")
-        self.save_images(self.incomplete, "incomplete")
-
-    def rescale_pixel_values(self, images):
-        """
-        Rescale the range of values in images to be between [0, 1]
-        """
-        images = np.asarray(images).copy()
-        images = images.astype("float32")
-        images -= images.min()
-        images /= images.max()
-        return images
+        self.save_images(self.images_array, "original", flattened=False)
+        self.save_images(self.incomplete_images, "incomplete", flattened=False)
 
     def ensure_dir(self, dirname):
         if not exists(dirname):
             print("Creating directory: %s" % dirname)
             mkdir(dirname)
 
-    def save_images(self, images, base_filename):
-        imshape = (self.width, self.height)
+    def save_images(self, images, base_filename, flattened=True):
         self.ensure_dir(self.dirname)
         for i in self.saved_image_indices:
-            image = images[i, :].copy().reshape(imshape)
+            label = self.labels[i].lower().replace(" ", "_")
+            image = images[i, :].copy()
+            if flattened:
+                image = image.reshape(self.image_shape)
             image[np.isnan(image)] = 0
             figure = pylab.gcf()
             axes = pylab.gca()
-            axes.imshow(image, vmin=0, vmax=1, cmap="gray")
+            extra_kwargs = {}
+            if self.color:
+                extra_kwargs["cmap"] = "gray"
+            assert image.min() >= 0, "Image can't contain negative numbers"
+            if image.max() <= 1:
+                image *= 256
+            image[image > 255] = 255
+            axes.imshow(image.astype("uint8"), **extra_kwargs)
             axes.get_xaxis().set_visible(False)
             axes.get_yaxis().set_visible(False)
-            filename = base_filename + "_%d" % (i) + ".png"
-            subdir = join(self.dirname, str(i))
+            filename = base_filename + ".png"
+            subdir = join(self.dirname, label)
             self.ensure_dir(subdir)
             path = join(subdir, filename)
             figure.savefig(
@@ -123,11 +174,11 @@ class ResultsTable(object):
         completed = self.normalizer.inverse_transform(completed_normalized)
 
         mae = masked_mae(
-            X_true=self.original,
+            X_true=self.flattened_images,
             X_pred=completed,
             mask=self.missing_mask)
         mse = masked_mse(
-            X_true=self.original,
+            X_true=self.flattened_images,
             X_pred=completed,
             mask=self.missing_mask)
         print("==> %s: MSE=%0.4f MAE=%0.4f" % (name, mse, mae))
@@ -177,62 +228,64 @@ class ResultsTable(object):
             f.write(html)
         return html
 
-if __name__ == "__main__":
-    dataset = fetch_olivetti_faces()
-    original = dataset.data
 
-    table = ResultsTable(original)
+def image_per_label(images, label_indices, label_names, max_size=2000):
+    groups = defaultdict(list)
+    for i, label_idx in enumerate(label_indices):
+        label = label_names[label_idx].lower().strip().replace(" ", "_")
+        groups[label].append(images[i])
+
+    # as a pretty arbitrary heuristic, let's try taking the min variance
+    # image for each person
+    singe_images = {}
+    for label, images in sorted(groups.items()):
+        singe_images[label] = min(images, key=lambda image: image.std())
+        if max_size and len(singe_images) >= max_size:
+            break
+    return singe_images
+
+
+def get_lfw(max_size=None):
+    dataset = fetch_lfw_people(color=True)
+    # keep only one image per person
+    return image_per_label(
+        dataset.images,
+        dataset.target,
+        dataset.target_names,
+        max_size=max_size)
+
+if __name__ == "__main__":
+    images_dict = get_lfw(max_size=2000)
+    table = ResultsTable(
+        images_dict=images_dict,
+        scale_rows=True,
+        center_rows=True)
 
     for fill_method in ["mean", "median"]:
         table.add_entry(
             solver=SimpleFill(fill_method=fill_method),
             name="SimpleFill_%s" % fill_method)
 
-    table.add_entry(
-        solver=MICE(
-            n_imputations=100,
-            approximate_but_fast_mode=True),
-        name="MICE")
-
-    for k in [1, 3, 5]:
+    for k in [1, 5, 17]:
         table.add_entry(
             solver=DenseKNN(
                 k=k,
                 orientation="rows"),
             name="DenseKNN_k%d" % (k,))
 
-    for shrinkage_value in [25, 50, 100]:
+    for shrinkage_value in [25, 100, 400]:
         # SoftImpute without rank constraints
         table.add_entry(
             solver=SoftImpute(
                 shrinkage_value=shrinkage_value),
             name="SoftImpute_lambda%d" % (shrinkage_value,))
 
-    for rank in [5, 50]:
+    for rank in [10, 40, 160]:
         table.add_entry(
             solver=IterativeSVD(
                 rank=rank,
                 init_fill_method="zero"),
             name="IterativeSVD_rank%d" % (rank,))
-        """
-        table.add_entry(
-            solver=AutoEncoder(
-                hidden_layer_sizes=[200, rank],
-                hidden_activation="tanh",
-                output_activation="linear",
-                patience_epochs=25,
-                n_burn_in_epochs=0,
-                recurrent_weight=1.0,
-                missing_input_noise_weight=0,
-            ),
-            name="AutoEncoder_rank%d" % (rank,))
-        table.add_entry(
-            solver=MatrixFactorization(
-                rank,
-                l1_penalty=0.1,
-                l2_penalty=0.1),
-            name="MatrixFactorization_rank%d" % rank)
-        """
 
     table.save_html_table()
     table.print_sorted_errors()

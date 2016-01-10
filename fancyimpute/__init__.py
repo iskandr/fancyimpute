@@ -11,7 +11,8 @@ from .iterative_svd import IterativeSVD
 from .simple_fill import SimpleFill
 from .soft_impute import SoftImpute
 from .biscaler import BiScaler
-from .dense_knn import DenseKNN
+from .dense_knn import DenseKNN, knn_impute, knn_impute_experimental
+from .normalized_distance import all_pairs_normalized_distances
 
 __all__ = [
     "NuclearNormMinimization",
@@ -27,4 +28,7 @@ __all__ = [
     "neuralnet_helpers",
     "BiScaler",
     "DenseKNN",
+    "all_pairs_normalized_distances",
+    "knn_impute",
+    "knn_impute_experimental"
 ]
