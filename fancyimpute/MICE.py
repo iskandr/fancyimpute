@@ -187,13 +187,18 @@ class MICE(Solver):
         Does one entire round-robin set of updates.
         """
         n_rows, n_cols = X_filled.shape
+        # since we're accessing the missing mask one column at a time,
+        # lay it out so that columns are contiguous
+        missing_mask = np.asarray(missing_mask, order="F")
         observed_mask = ~missing_mask
+
+        n_missing_for_each_column = missing_mask.sum(axis=0)
+
         for col_idx in visit_indices:
             missing_mask_col = missing_mask[:, col_idx]  # missing mask for this column
-            n_missing_for_this_col = missing_mask_col.sum()
+            n_missing_for_this_col = n_missing_for_each_column[col_idx]
             if n_missing_for_this_col > 0:  # if we have any missing data at all
                 n_observed_for_this_col = n_rows - n_missing_for_this_col
-
                 observed_row_mask_for_col = observed_mask[:, col_idx]
                 # The other columns we will use to predict the current one
                 other_cols = np.array(list(range(0, col_idx)) + list(range(col_idx + 1, n_cols)))
@@ -223,7 +228,7 @@ class MICE(Solver):
                     D = np.abs(col_preds_missing[:, np.newaxis] - col_preds_observed)  # distances
                     # take top k neighbors
                     k = np.minimum(self.n_neighbors, len(col_preds_observed) - 1)
-                    # NN = np.argsort(D,1)[:,:k] too slooooow
+
                     NN = np.argpartition(D, k, 1)[:, :k]  # <- bottleneck!
                     # pick one of the 5 nearest neighbors at random! that's right!
                     # not even an average

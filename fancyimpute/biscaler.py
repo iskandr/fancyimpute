@@ -278,7 +278,6 @@ class BiScaler(object):
                 row_means,
                 column_means)
             if self.scale_rows:
-                print("[BiScaler] Estimating row scales")
                 row_scales = self.estimate_row_scales(
                     X_centered=X_centered,
                     column_scales=column_scales)

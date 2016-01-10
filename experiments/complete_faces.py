@@ -39,29 +39,69 @@ def remove_pixels(
     return np.array(incomplete_faces, dtype=np.float32)
 
 
+def rescale_pixel_values(images, order="C"):
+    """
+    Rescale the range of values in images to be between [0, 1]
+    """
+    images = np.asarray(images, order=order).astype("float32")
+    images -= images.min()
+    images /= images.max()
+    return images
+
+
+def color_balance(images):
+    images = images.astype("float32")
+    red = images[:, :, :, 0]
+    green = images[:, :, :, 1]
+    blue = images[:, :, :, 2]
+    combined = (red + green + blue)
+    total_color = combined.sum()
+    overall_fraction_red = red.sum() / total_color
+    overall_fraction_green = green.sum() / total_color
+    overall_fraction_blue = blue.sum() / total_color
+
+    for i in range(images.shape[0]):
+        image = images[i]
+        image_total = combined[i].sum()
+        red_scale = overall_fraction_red / (red[i].sum() / image_total)
+        green_scale = overall_fraction_green / (green[i].sum() / image_total)
+        blue_scale = overall_fraction_blue / (blue[i].sum() / image_total)
+        image[:, :, 0] *= red_scale
+        image[:, :, 1] *= green_scale
+        image[:, :, 2] *= blue_scale
+    image[image < 0] = 0
+    image[image > 255] = 255
+    return images
+
+
 class ResultsTable(object):
 
     def __init__(
             self,
-            images,
+            images_dict,
             percent_missing=0.25,
             saved_image_stride=125,
             dirname="face_images",
             scale_rows=False,
             center_rows=False):
-        self.images = np.asarray(images, order="C").astype("float32")
-        self.image_shape = images[0].shape
+        self.images_dict = images_dict
+        self.labels = list(sorted(images_dict.keys()))
+        self.images_array = np.array(
+            [images_dict[k] for k in self.labels]).astype("float32")
+        self.image_shape = self.images_array[0].shape
         self.width, self.height = self.image_shape[:2]
         self.color = (len(self.image_shape) == 3) and (self.image_shape[2] == 3)
+        if self.color:
+            self.images_array = color_balance(self.images_array)
         self.n_pixels = self.width * self.height
         self.n_features = self.n_pixels * (3 if self.color else 1)
-        self.n_images = len(self.images)
+        self.n_images = len(self.images_array)
         print("[ResultsTable] # images = %d, color=%s # features = %d, shape = %s" % (
             self.n_images, self.color, self.n_features, self.image_shape))
 
         self.flattened_array_shape = (self.n_images, self.n_features)
 
-        self.flattened_images = self.images.reshape(self.flattened_array_shape)
+        self.flattened_images = self.images_array.reshape(self.flattened_array_shape)
 
         n_missing_pixels = int(self.n_pixels * percent_missing)
 
@@ -69,7 +109,7 @@ class ResultsTable(object):
         print("[ResultsTable] n_missing_pixels = %d, missing_square_size = %d" % (
             n_missing_pixels, missing_square_size))
         self.incomplete_images = remove_pixels(
-            self.images,
+            self.images_array,
             missing_square_size=missing_square_size)
         print("[ResultsTable] Incomplete images shape = %s" % (
             self.incomplete_images.shape,))
@@ -79,8 +119,8 @@ class ResultsTable(object):
         self.normalizer = BiScaler(
             scale_rows=scale_rows,
             center_rows=center_rows,
-            min_value=self.images.min(),
-            max_value=self.images.max())
+            min_value=self.images_array.min(),
+            max_value=self.images_array.max())
         self.incomplete_normalized = self.normalizer.fit_transform(
             self.flattened_incomplete_images)
 
@@ -91,17 +131,8 @@ class ResultsTable(object):
         self.mse_dict = {}
         self.mae_dict = {}
 
-        self.save_images(self.images, "original", flattened=False)
+        self.save_images(self.images_array, "original", flattened=False)
         self.save_images(self.incomplete_images, "incomplete", flattened=False)
-
-    def rescale_pixel_values(self, images, order="C"):
-        """
-        Rescale the range of values in images to be between [0, 1]
-        """
-        images = np.asarray(images, order=order).astype("float32")
-        images -= images.min()
-        images /= images.max()
-        return images
 
     def ensure_dir(self, dirname):
         if not exists(dirname):
@@ -111,6 +142,7 @@ class ResultsTable(object):
     def save_images(self, images, base_filename, flattened=True):
         self.ensure_dir(self.dirname)
         for i in self.saved_image_indices:
+            label = self.labels[i].lower().replace(" ", "_")
             image = images[i, :].copy()
             if flattened:
                 image = image.reshape(self.image_shape)
@@ -120,11 +152,15 @@ class ResultsTable(object):
             extra_kwargs = {}
             if self.color:
                 extra_kwargs["cmap"] = "gray"
-            axes.imshow((image * 256).astype("uint8"), **extra_kwargs)
+            assert image.min() >= 0, "Image can't contain negative numbers"
+            if image.max() <= 1:
+                image *= 256
+            image[image > 255] = 255
+            axes.imshow(image.astype("uint8"), **extra_kwargs)
             axes.get_xaxis().set_visible(False)
             axes.get_yaxis().set_visible(False)
-            filename = base_filename + "_%d" % (i) + ".png"
-            subdir = join(self.dirname, str(i))
+            filename = base_filename + ".png"
+            subdir = join(self.dirname, label)
             self.ensure_dir(subdir)
             path = join(subdir, filename)
             figure.savefig(
@@ -193,49 +229,58 @@ class ResultsTable(object):
         return html
 
 
-def unique_images(images, labels, max_size=1000):
-    result = []
-    seen_labels = set([])
-    for i, label in enumerate(labels):
-        if label in seen_labels:
-            continue
-        result.append(images[i])
-        seen_labels.add(label)
-        if max_size and len(seen_labels) >= max_size:
+def image_per_label(images, label_indices, label_names, max_size=2000):
+    groups = defaultdict(list)
+    for i, label_idx in enumerate(label_indices):
+        label = label_names[label_idx].lower().strip().replace(" ", "_")
+        groups[label].append(images[i])
+
+    # as a pretty arbitrary heuristic, let's try taking the min variance
+    # image for each person
+    singe_images = {}
+    for label, images in sorted(groups.items()):
+        singe_images[label] = min(images, key=lambda image: image.std())
+        if max_size and len(singe_images) >= max_size:
             break
-    return np.array(result)
+    return singe_images
 
 
-def get_lfw(n=None):
+def get_lfw(max_size=None):
     dataset = fetch_lfw_people(color=True)
     # keep only one image per person
-    return unique_images(dataset.images, dataset.target, max_size=n)
-
+    return image_per_label(
+        dataset.images,
+        dataset.target,
+        dataset.target_names,
+        max_size=max_size)
 
 if __name__ == "__main__":
-    images = get_lfw(n=1000)
-    table = ResultsTable(images)
-
-    for k in [1, 5, 9]:
-        table.add_entry(
-            solver=DenseKNN(
-                k=k,
-                orientation="rows"),
-            name="DenseKNN_k%d" % (k,))
+    images_dict = get_lfw(max_size=2000)
+    table = ResultsTable(
+        images_dict=images_dict,
+        scale_rows=True,
+        center_rows=True)
 
     for fill_method in ["mean", "median"]:
         table.add_entry(
             solver=SimpleFill(fill_method=fill_method),
             name="SimpleFill_%s" % fill_method)
 
-    for shrinkage_value in [25, 50, 100]:
+    for k in [1, 5, 17]:
+        table.add_entry(
+            solver=DenseKNN(
+                k=k,
+                orientation="rows"),
+            name="DenseKNN_k%d" % (k,))
+
+    for shrinkage_value in [25, 100, 400]:
         # SoftImpute without rank constraints
         table.add_entry(
             solver=SoftImpute(
                 shrinkage_value=shrinkage_value),
             name="SoftImpute_lambda%d" % (shrinkage_value,))
 
-    for rank in [10, 20, 40]:
+    for rank in [10, 40, 160]:
         table.add_entry(
             solver=IterativeSVD(
                 rank=rank,
