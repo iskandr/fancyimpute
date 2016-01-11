@@ -12,6 +12,8 @@ from fancyimpute import (
     SoftImpute,
     BiScaler,
     DenseKNN,
+    MICE,
+    BayesianRidgeRegression,
 )
 from fancyimpute.common import masked_mae, masked_mse
 
@@ -258,8 +260,18 @@ if __name__ == "__main__":
     images_dict = get_lfw(max_size=2000)
     table = ResultsTable(
         images_dict=images_dict,
-        scale_rows=True,
-        center_rows=True)
+        scale_rows=False,
+        center_rows=False)
+
+    for negative_log_regularization_weight in [1, 2, 3]:
+        regularization_weight = 10.0 ** -negative_log_regularization_weight
+        table.add_entry(
+            solver=MICE(
+                n_nearest_columns=20,
+                model=BayesianRidgeRegression(lambda_reg=regularization_weight)
+            ),
+
+            name="MICE_%d" % negative_log_regularization_weight)
 
     for fill_method in ["mean", "median"]:
         table.add_entry(
@@ -273,7 +285,7 @@ if __name__ == "__main__":
                 orientation="rows"),
             name="DenseKNN_k%d" % (k,))
 
-    for shrinkage_value in [25, 100, 400]:
+    for shrinkage_value in [50, 200, 800]:
         # SoftImpute without rank constraints
         table.add_entry(
             solver=SoftImpute(

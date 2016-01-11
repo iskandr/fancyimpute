@@ -11,6 +11,7 @@
 # limitations under the License.
 
 from __future__ import absolute_import, print_function, division
+from time import time
 
 import numpy as np
 
@@ -50,12 +51,12 @@ class MICE(Solver):
 
     add_ones : boolean
         Whether to add a constant column of ones. Defaults to True.
-            
+
     n_nearest_columns : int
         Number of other columns to use to estimate current column.
-        Useful when number of columns is huge. 
+        Useful when number of columns is huge.
         Default is to use all columns.
-            
+
     verbose : boolean
     """
 
@@ -65,7 +66,7 @@ class MICE(Solver):
             n_imputations=100,
             n_burn_in=10,  # this many replicates will be thrown away
             n_neighbors=5,  # number of nearest neighbors in PMM
-            impute_type='col', # also can be pmm
+            impute_type='col',  # also can be pmm
             model=BayesianRidgeRegression(lambda_reg=0.001),
             add_ones=True,
             n_nearest_columns=np.infty,
@@ -74,7 +75,7 @@ class MICE(Solver):
         Parameters
         ----------
         visit_sequence : str
-            Possible values: "monotone" (default), "roman", "arabic", 
+            Possible values: "monotone" (default), "roman", "arabic",
                 "revmonotone".
 
         n_imputations : int
@@ -100,10 +101,10 @@ class MICE(Solver):
 
         add_ones : boolean
             Whether to add a constant column of ones. Defaults to True.
-            
+
         n_nearest_columns : int
             Number of other columns to use to estimate current column.
-            Useful when number of columns is huge. 
+            Useful when number of columns is huge.
             Default is to use all columns.
 
         verbose : boolean
@@ -131,33 +132,45 @@ class MICE(Solver):
         # lay it out so that columns are contiguous
         missing_mask = np.asarray(missing_mask, order="F")
         observed_mask = ~missing_mask
-        if (n_cols - int(self.add_ones) > self.n_nearest_columns):
+        # number of columns excluding the optional constant column
+        n_original_cols = n_cols - int(self.add_ones)
+
+        if n_original_cols > self.n_nearest_columns:
             abs_correlation_matrix = np.abs(np.corrcoef(X_filled.T))
+
         n_missing_for_each_column = missing_mask.sum(axis=0)
+        ordered_column_indices = np.arange(n_cols)
         for col_idx in visit_indices:
             missing_mask_col = missing_mask[:, col_idx]  # missing mask for this column
             n_missing_for_this_col = n_missing_for_each_column[col_idx]
             if n_missing_for_this_col > 0:  # if we have any missing data at all
                 observed_row_mask_for_col = observed_mask[:, col_idx]
-                other_cols = np.array(list(range(0, col_idx)) + list(range(col_idx + 1, n_cols)))
                 output = X_filled[observed_row_mask_for_col, col_idx]
-                if (n_cols - int(self.add_ones) > self.n_nearest_columns):
-                    # probability of column draw is proportional to absolute 
+
+                other_cols = np.concatenate([
+                    ordered_column_indices[:col_idx],
+                    ordered_column_indices[col_idx + 1:]
+                ])
+
+                if n_original_cols > self.n_nearest_columns:
+                    # probability of column draw is proportional to absolute
                     # pearson correlation
-                    p = abs_correlation_matrix[col_idx,other_cols]
+                    p = abs_correlation_matrix[col_idx, other_cols]
                     if self.add_ones:
-                        p = p[:-1]/p[:-1].sum()
-                        other_cols = np.random.choice(other_cols[:-1],
-                                                      self.n_nearest_columns,
-                                                      replace=False,
-                                                      p=p)
-                        other_cols = np.append(other_cols,other_cols[:-1])
+                        p = p[:-1] / p[:-1].sum()
+                        other_cols = np.random.choice(
+                            other_cols[:-1],
+                            self.n_nearest_columns,
+                            replace=False,
+                            p=p)
+                        other_cols = np.append(other_cols, other_cols[:-1])
                     else:
                         p /= p.sum()
-                        other_cols = np.random.choice(other_cols,
-                                                      self.n_nearest_columns,
-                                                      replace=False,
-                                                      p=p)
+                        other_cols = np.random.choice(
+                            other_cols,
+                            self.n_nearest_columns,
+                            replace=False,
+                            p=p)
 
                 inputs = X_filled[np.ix_(observed_row_mask_for_col, other_cols)]
                 brr = self.model
@@ -192,8 +205,10 @@ class MICE(Solver):
                     # X_filled[missing_mask_col,col] = \
                     #   brr.posterior_predictive_draw(X_missing)
                     mus, sigmas_squared = brr.predict_dist(X_missing)
-                    X_filled[missing_mask_col, col_idx] = \
-                        np.random.normal(mus, np.sqrt(sigmas_squared))
+                    # inplace sqrt of sigma_squared
+                    sigmas = sigmas_squared
+                    np.sqrt(sigmas_squared, out=sigmas)
+                    X_filled[missing_mask_col, col_idx] = np.random.normal(mus, sigmas)
         return X_filled
 
     def initialize(self, X, missing_mask, visit_indices):
@@ -238,7 +253,7 @@ class MICE(Solver):
         of length self.n_imputations, and a mask that specifies where these values
         belong in X.
         """
-
+        start_t = time()
         self._check_input(X)
         missing_mask = np.isnan(X)
         self._check_missing_value_mask(missing_mask)
@@ -262,8 +277,11 @@ class MICE(Solver):
 
         for m in range(total_rounds):
             if self.verbose:
-                print("[MICE] Imputation round %d/%d:" % (
-                    m + 1, total_rounds))
+                print(
+                    "[MICE] Starting imputation round %d/%d, elapsed time %0.3f" % (
+                        m + 1,
+                        total_rounds,
+                        time() - start_t))
             X_filled = self.perform_imputation_round(
                 X_filled=X_filled,
                 missing_mask=missing_mask,
