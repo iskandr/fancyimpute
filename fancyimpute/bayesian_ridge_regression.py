@@ -20,9 +20,24 @@ from numpy.random import multivariate_normal
 class BayesianRidgeRegression(object):
     """
     Bayesian Ridge Regression
-
     """
-    def __init__(self, lambda_reg=1e-5, add_ones=False, normalize_lambda=True):
+    def __init__(self, lambda_reg=0.001, add_ones=False, normalize_lambda=True):
+        '''
+        Parameters
+        ----------
+        lambda_reg : float
+            Ridge regularization parameter.
+            Default is 0.001.
+
+        add_ones : boolean
+            Whether to add a constant column of ones.
+            Default is False.
+
+        normalize_lambda : boolean
+            Default is True.
+            This variant multiplies lambda_reg by
+            np.linalg.norm(np.dot(X.T,X))
+        '''
         self.lambda_reg = lambda_reg
         self.add_ones = add_ones
         self.normalize_lambda = normalize_lambda

@@ -268,6 +268,8 @@ if __name__ == "__main__":
         table.add_entry(
             solver=MICE(
                 n_nearest_columns=20,
+                n_imputations=20,
+                n_burn_in=5,
                 model=BayesianRidgeRegression(lambda_reg=regularization_weight)
             ),
 
