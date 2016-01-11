@@ -70,6 +70,7 @@ class MICE(Solver):
             model=BayesianRidgeRegression(lambda_reg=0.001),
             add_ones=True,
             n_nearest_columns=np.infty,
+            init_fill_method="mean",
             verbose=True):
         """
         Parameters
@@ -107,6 +108,11 @@ class MICE(Solver):
             Useful when number of columns is huge.
             Default is to use all columns.
 
+        init_fill_method : str
+            Valid values: {"mean", "median", or "random"}
+            (the latter meaning fill with random samples from the observed
+            values of a column)
+
         verbose : boolean
         """
         self.visit_sequence = visit_sequence
@@ -117,21 +123,20 @@ class MICE(Solver):
         self.model = model
         self.add_ones = add_ones
         self.n_nearest_columns = n_nearest_columns
+        self.init_fill_method = init_fill_method
         self.verbose = verbose
 
     def perform_imputation_round(
             self,
             X_filled,
             missing_mask,
+            observed_mask,
             visit_indices):
         """
         Does one entire round-robin set of updates.
         """
         n_rows, n_cols = X_filled.shape
-        # since we're accessing the missing mask one column at a time,
-        # lay it out so that columns are contiguous
-        missing_mask = np.asarray(missing_mask, order="F")
-        observed_mask = ~missing_mask
+
         # number of columns excluding the optional constant column
         n_original_cols = n_cols - int(self.add_ones)
 
@@ -140,49 +145,69 @@ class MICE(Solver):
 
         n_missing_for_each_column = missing_mask.sum(axis=0)
         ordered_column_indices = np.arange(n_cols)
+
         for col_idx in visit_indices:
-            missing_mask_col = missing_mask[:, col_idx]  # missing mask for this column
+            # which rows are missing for this column
+            missing_row_mask_for_this_col = missing_mask[:, col_idx]
             n_missing_for_this_col = n_missing_for_each_column[col_idx]
             if n_missing_for_this_col > 0:  # if we have any missing data at all
-                observed_row_mask_for_col = observed_mask[:, col_idx]
-                output = X_filled[observed_row_mask_for_col, col_idx]
+                observed_row_mask_for_this_col = observed_mask[:, col_idx]
+                column_values = X_filled[:, col_idx]
+                column_values_observed = column_values[observed_row_mask_for_this_col]
 
-                other_cols = np.concatenate([
-                    ordered_column_indices[:col_idx],
-                    ordered_column_indices[col_idx + 1:]
-                ])
-
-                if n_original_cols > self.n_nearest_columns:
+                if n_original_cols <= self.n_nearest_columns:
+                    other_column_indices = np.concatenate([
+                        ordered_column_indices[:col_idx],
+                        ordered_column_indices[col_idx + 1:]
+                    ])
+                else:
                     # probability of column draw is proportional to absolute
                     # pearson correlation
-                    p = abs_correlation_matrix[col_idx, other_cols]
+                    p = abs_correlation_matrix[col_idx, :]
+                    # save this probability so that we can put it back
+                    # after temporarily zeroing it out
+                    current_column_prob = p[col_idx]
+                    # make the probability of choosing the current column
+                    # zero
+                    p[col_idx] = 0
                     if self.add_ones:
                         p = p[:-1] / p[:-1].sum()
-                        other_cols = np.random.choice(
-                            other_cols[:-1],
+                        other_column_indices = np.random.choice(
+                            ordered_column_indices[:-1],
                             self.n_nearest_columns,
                             replace=False,
                             p=p)
-                        other_cols = np.append(other_cols, other_cols[:-1])
+                        other_column_indices = np.append(
+                            other_column_indices,
+                            n_original_cols)
                     else:
                         p /= p.sum()
-                        other_cols = np.random.choice(
-                            other_cols,
+                        other_column_indices = np.random.choice(
+                            ordered_column_indices,
                             self.n_nearest_columns,
                             replace=False,
                             p=p)
+                    # restore the probability value that we momentarily
+                    # set to zero
+                    p[col_idx] = current_column_prob
 
-                inputs = X_filled[np.ix_(observed_row_mask_for_col, other_cols)]
+                X_other_cols = X_filled[:, other_column_indices]
+                X_other_cols_observed = X_other_cols[observed_row_mask_for_this_col]
                 brr = self.model
-                brr.fit(inputs, output, inverse_covariance=None)
+                brr.fit(
+                    X_other_cols_observed,
+                    column_values_observed,
+                    inverse_covariance=None)
 
                 # Now we choose the row method (PMM) or the column method.
                 if self.impute_type == 'pmm':  # this is the PMM procedure
                     # predict values for missing values using random beta draw
-                    X_missing = X_filled[np.ix_(missing_mask_col, other_cols)]
+                    X_missing = X_filled[
+                        np.ix_(missing_row_mask_for_this_col, other_column_indices)]
                     col_preds_missing = brr.predict(X_missing, random_draw=True)
                     # predict values for observed values using best estimated beta
-                    X_observed = X_filled[np.ix_(observed_row_mask_for_col, other_cols)]
+                    X_observed = X_filled[
+                        np.ix_(observed_row_mask_for_this_col, other_column_indices)]
                     col_preds_observed = brr.predict(X_observed, random_draw=False)
                     # for each missing value, find its nearest neighbors in the observed values
                     D = np.abs(col_preds_missing[:, np.newaxis] - col_preds_observed)  # distances
@@ -193,36 +218,43 @@ class MICE(Solver):
                     NN_sampled = [np.random.choice(NN_row) for NN_row in NN]
                     # set the missing values to be the values of the nearest
                     # neighbor in the output space
-                    X_filled[missing_mask_col, col_idx] = \
-                        X_filled[observed_row_mask_for_col, col_idx][NN_sampled]
+                    X_filled[missing_row_mask_for_this_col, col_idx] = \
+                        column_values_observed[NN_sampled]
                 elif self.impute_type == 'col':
-                    X_missing = X_filled[np.ix_(missing_mask_col, other_cols)]
+                    X_other_cols_missing = X_other_cols[missing_row_mask_for_this_col]
                     # predict values for missing values using posterior predictive draws
                     # see the end of this:
                     # https://www.cs.utah.edu/~fletcher/cs6957/lectures/BayesianLinearRegression.pdf
-                    # X_filled[missing_mask_col,col] = \
-                    #   brr.posterior_predictive_draw(X_missing)
-                    mus, sigmas_squared = brr.predict_dist(X_missing)
+                    mus, sigmas_squared = brr.predict_dist(X_other_cols_missing)
                     # inplace sqrt of sigma_squared
                     sigmas = sigmas_squared
                     np.sqrt(sigmas_squared, out=sigmas)
-                    X_filled[missing_mask_col, col_idx] = np.random.normal(mus, sigmas)
+                    imputed_values = np.random.normal(mus, sigmas)
+                    X_filled[missing_row_mask_for_this_col, col_idx] = imputed_values
         return X_filled
 
-    def initialize(self, X, missing_mask, visit_indices):
+    def initialize(self, X, missing_mask, observed_mask, visit_indices):
         """
         Initialize the missing values by simple sampling from the same column.
         """
-        X_filled = X.copy()
-        observed_mask = ~missing_mask
+        # lay out X's elements in Fortran/column-major order since it's
+        # often going to be accessed one column at a time
+        X_filled = X.copy(order="F")
         for col_idx in visit_indices:
             missing_mask_col = missing_mask[:, col_idx]
-            if np.sum(missing_mask_col) > 0:
+            n_missing = missing_mask_col.sum()
+            if n_missing > 0:
                 observed_row_mask_for_col = observed_mask[:, col_idx]
-                observed_col = X_filled[observed_row_mask_for_col, col_idx]
-                n_missing = np.sum(missing_mask_col)
-                random_values = np.random.choice(observed_col, n_missing)
-                X_filled[missing_mask_col, col_idx] = random_values
+                column = X_filled[:, col_idx]
+                observed_column = column[observed_row_mask_for_col]
+
+                if self.init_fill_method == "mean":
+                    fill_values = np.mean(observed_column)
+                elif self.init_fill_method == "median":
+                    fill_values = np.median(observed_column)
+                else:
+                    fill_values = np.random.choice(observed_column, n_missing)
+                X_filled[missing_mask_col, col_idx] = fill_values
         return X_filled
 
     def get_visit_indices(self, missing_mask):
@@ -255,7 +287,9 @@ class MICE(Solver):
         self._check_input(X)
         missing_mask = np.isnan(X)
         self._check_missing_value_mask(missing_mask)
+
         visit_indices = self.get_visit_indices(missing_mask)
+
         n_rows = len(X)
         if self.add_ones:
             X = np.column_stack((X, np.ones(n_rows)))
@@ -264,9 +298,15 @@ class MICE(Solver):
                 np.zeros(n_rows, dtype=missing_mask.dtype)
             ])
 
+        # since we're accessing the missing mask one column at a time,
+        # lay it out so that columns are contiguous
+        missing_mask = np.asarray(missing_mask, order="F")
+        observed_mask = ~missing_mask
+
         X_filled = self.initialize(
             X,
             missing_mask=missing_mask,
+            observed_mask=observed_mask,
             visit_indices=visit_indices)
 
         # now we jam up in the usual fashion for n_burn_in + n_imputations iterations
@@ -283,6 +323,7 @@ class MICE(Solver):
             X_filled = self.perform_imputation_round(
                 X_filled=X_filled,
                 missing_mask=missing_mask,
+                observed_mask=observed_mask,
                 visit_indices=visit_indices)
             if m >= self.n_burn_in:
                 results_list.append(X_filled[missing_mask])

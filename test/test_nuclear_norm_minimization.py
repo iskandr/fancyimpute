@@ -47,9 +47,9 @@ def test_rank1_symmetric_convex_solver():
 
 def test_nuclear_norm_minimization_with_low_rank_random_matrix():
     solver = NuclearNormMinimization(require_symmetric_solution=False)
-    XY_completed = solver.complete(XY_incomplete)
+    XY_completed = solver.complete(XY_incomplete[:100])
     _, missing_mae = reconstruction_error(
-        XY, XY_completed, missing_mask, name="NuclearNorm")
+        XY[:100], XY_completed, missing_mask[:100], name="NuclearNorm")
     assert missing_mae < 0.1, "Error too high!"
 
 if __name__ == "__main__":

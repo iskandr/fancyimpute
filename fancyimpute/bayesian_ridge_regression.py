@@ -22,7 +22,7 @@ class BayesianRidgeRegression(object):
     Bayesian Ridge Regression
     """
     def __init__(self, lambda_reg=0.001, add_ones=False, normalize_lambda=True):
-        '''
+        """
         Parameters
         ----------
         lambda_reg : float
@@ -37,7 +37,7 @@ class BayesianRidgeRegression(object):
             Default is True.
             This variant multiplies lambda_reg by
             np.linalg.norm(np.dot(X.T,X))
-        '''
+        """
         self.lambda_reg = lambda_reg
         self.add_ones = add_ones
         self.normalize_lambda = normalize_lambda
@@ -64,7 +64,6 @@ class BayesianRidgeRegression(object):
                 # We're trading a little more time spent in the Python
                 # interpreter with a savings of allocated arrays.
                 outer_product[i, i] += lambda_reg
-
             self.inverse_covariance = inv(outer_product)
         else:
             self.inverse_covariance = inverse_covariance
@@ -72,10 +71,12 @@ class BayesianRidgeRegression(object):
         self.beta_estimate = multi_dot([self.inverse_covariance, X_ones.T, y])
         # now we need the estimate of the noise variance
         # reference: https://stat.ethz.ch/R-manual/R-devel/library/stats/html/summary.lm.html
-        residuals = (y - self.predict(X))
-        # square all the residuals
-        residuals **= 2
-        self.sigma_squared_estimate = residuals.sum() / max((n - d), 1)
+        pred = dot(X_ones, self.beta_estimate)
+        # get the residual of the predictions and square it
+        pred -= y
+        pred **= 2
+        sum_squared_residuals = pred.sum()
+        self.sigma_squared_estimate = sum_squared_residuals / max((n - d), 1)
         self.covar = self.sigma_squared_estimate * self.inverse_covariance
 
     def predict(self, X, random_draw=False):
@@ -94,26 +95,32 @@ class BayesianRidgeRegression(object):
         else:
             return column_stack((X, ones(X.shape[0])))
 
-    # Random draws from the posterior over beta coefficients
-    # reference: https://www.cs.utah.edu/~fletcher/cs6957/lectures/BayesianLinearRegression.pdf
-    # page 1
-    # note that the pros something different:
-    # https://github.com/stefvanbuuren/mice/blob/master/R/mice.impute.norm.r
     def random_beta_draw(self, num_draws=1):
+        """
+        Random draws from the posterior over beta coefficients
+
+        For reference, see:
+        https://www.cs.utah.edu/~fletcher/cs6957/lectures/BayesianLinearRegression.pdf
+
+        Note that the pros use something different:
+        https://github.com/stefvanbuuren/mice/blob/master/R/mice.impute.norm.r
+        """
         return multivariate_normal(self.beta_estimate, self.covar, num_draws)
 
-    # Returns the mean and variance of the posterior predictive distribution
-    # Reference: https://www.cs.utah.edu/~fletcher/cs6957/lectures/BayesianLinearRegression.pdf
-    # page 2
     def predict_dist(self, X):
+        """
+        Returns the mean and variance of the posterior predictive distribution
+        For reference, see page #2 of:
+        https://www.cs.utah.edu/~fletcher/cs6957/lectures/BayesianLinearRegression.pdf
+        """
         if self.add_ones:
             X_ones = self.add_column_of_ones(X)
         else:
             X_ones = X
+        # mean is simply the linear regression prediction
         mus = dot(X_ones, self.beta_estimate)
-
-        rescaled_X = dot(X_ones, self.covar)
-        rescaled_X *= X_ones
-        sigmas_squared = rescaled_X.sum(axis=1)
+        X_dot_covar = dot(X_ones, self.covar)
+        X_dot_covar *= X_ones
+        sigmas_squared = X_dot_covar.sum(axis=1)
         sigmas_squared += self.sigma_squared_estimate
         return mus, sigmas_squared
