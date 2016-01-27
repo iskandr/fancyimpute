@@ -25,39 +25,47 @@ class MICE(Solver):
     This version assumes all of the columns are ordinal,
     and uses ridge regression.
 
-    Parameters
-    ----------
-    visit_sequence : str
-        Possible values: "monotone" (default), "roman", "arabic", "revmonotone".
+        Parameters
+        ----------
+        visit_sequence : str
+            Possible values: "monotone" (default), "roman", "arabic",
+                "revmonotone".
 
-    n_imputations : int
-        Defaults to 100
+        n_imputations : int
+            Defaults to 100
 
-    n_burn_in : int
-        Defaults to 10
+        n_burn_in : int
+            Defaults to 10
 
-    impute_type : str
-        "row" means classic PMM, "col" (default) means fill in linear preds.
+        impute_type : str
+            "ppm" is probablistic moment matching.
+            "col" (default) means fill in with samples from posterior predictive
+                distribution.
 
-    n_pmm_neighbors : int
-        Number of nearest neighbors for PMM, defaults to 5.
+        n_pmm_neighbors : int
+            Number of nearest neighbors for PMM, defaults to 5.
 
-    model : predictor function
-        A model that has fit, predict, and predict_dist methods.
-        Defaults to BayesianRidgeRegression(lambda_reg=0.001).
-        Note that the regularization parameter lambda_reg
-        is by default scaled by np.linalg.norm(np.dot(X.T,X)).
-        Sensible lambda_regs to try: 0.25, 0.1, 0.01, 0.001, 0.0001.
+        model : predictor function
+            A model that has fit, predict, and predict_dist methods.
+            Defaults to BayesianRidgeRegression(lambda_reg=0.001).
+            Note that the regularization parameter lambda_reg
+            is by default scaled by np.linalg.norm(np.dot(X.T,X)).
+            Sensible lambda_regs to try: 0.25, 0.1, 0.01, 0.001, 0.0001.
 
-    add_ones : boolean
-        Whether to add a constant column of ones. Defaults to True.
+        add_ones : boolean
+            Whether to add a constant column of ones. Defaults to True.
 
-    n_nearest_columns : int
-        Number of other columns to use to estimate current column.
-        Useful when number of columns is huge.
-        Default is to use all columns.
+        n_nearest_columns : int
+            Number of other columns to use to estimate current column.
+            Useful when number of columns is huge.
+            Default is to use all columns.
 
-    verbose : boolean
+        init_fill_method : str
+            Valid values: {"mean", "median", or "random"}
+            (the latter meaning fill with random samples from the observed
+            values of a column)
+
+        verbose : boolean
     """
 
     def __init__(
@@ -95,10 +103,10 @@ class MICE(Solver):
 
         model : predictor function
             A model that has fit, predict, and predict_dist methods.
-        Defaults to BayesianRidgeRegression(lambda_reg=0.001).
-        Note that the regularization parameter lambda_reg
-        is by default scaled by np.linalg.norm(np.dot(X.T,X)).
-        Sensible lambda_regs to try: 0.25, 0.1, 0.01, 0.001, 0.0001.
+            Defaults to BayesianRidgeRegression(lambda_reg=0.001).
+            Note that the regularization parameter lambda_reg
+            is by default scaled by np.linalg.norm(np.dot(X.T,X)).
+            Sensible lambda_regs to try: 0.1, 0.01, 0.001, 0.0001.
 
         add_ones : boolean
             Whether to add a constant column of ones. Defaults to True.

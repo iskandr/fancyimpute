@@ -16,7 +16,7 @@ X_incomplete = X.copy()
 X_incomplete[missing_mask] = np.nan
 
 # rescale both rows and columns to have zero mean and unit variance
-X_incomplete_normalized = BiScaler.fit_transform(X_incomplete)
+X_incomplete_normalized = biscaler.fit_transform(X_incomplete)
 
 # use 3 nearest rows which have a feature to fill in each row's missing features
 knn_solver = DenseKNN(k=3)
