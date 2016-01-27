@@ -19,7 +19,7 @@ X_incomplete[missing_mask] = np.nan
 X_incomplete_normalized = biscaler.fit_transform(X_incomplete)
 
 # use 3 nearest rows which have a feature to fill in each row's missing features
-knn_solver = DenseKNN(k=3)
+knn_solver = KNN(k=3)
 X_filled_normalized = knn_solver.complete(X_incomplete)
 X_filled = biscaler.inverse_transform(X_knn_normalized)
 
@@ -31,7 +31,7 @@ print("MSE of reconstruction: %f" % mse)
 
 * `SimpleFill`: Replaces missing entries with the mean or median of each column.
 
-* `DenseKNN`: Nearest neighbor imputations which weights samples using the mean squared difference
+* `KNN`: Nearest neighbor imputations which weights samples using the mean squared difference
 on features for which two rows both have observed data.
 
 * `SoftImpute`: Matrix completion by iterative soft thresholding of SVD decompositions. Inspired by the [softImpute](https://web.stanford.edu/~hastie/swData/softImpute/vignette.html) package for R, which is based on [Spectral Regularization Algorithms for Learning Large Incomplete Matrices](http://web.stanford.edu/~hastie/Papers/mazumder10a.pdf) by Mazumder et. al.
