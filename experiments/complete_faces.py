@@ -82,7 +82,7 @@ class ResultsTable(object):
             self,
             images_dict,
             percent_missing=0.25,
-            saved_image_stride=125,
+            saved_image_stride=25,
             dirname="face_images",
             scale_rows=False,
             center_rows=False):
@@ -263,17 +263,16 @@ if __name__ == "__main__":
         scale_rows=False,
         center_rows=False)
 
-    for negative_log_regularization_weight in [1, 2, 3]:
+    for negative_log_regularization_weight in [2, 3, 4]:
         regularization_weight = 10.0 ** -negative_log_regularization_weight
         table.add_entry(
             solver=MICE(
-                n_nearest_columns=25,
-                n_imputations=20,
-                n_burn_in=10,
+                n_nearest_columns=80,
+                n_imputations=100,
+                n_burn_in=5,
                 model=BayesianRidgeRegression(lambda_reg=regularization_weight),
                 init_fill_method="mean",
             ),
-
             name="MICE_%d" % negative_log_regularization_weight)
 
     for fill_method in ["mean", "median"]:
@@ -281,21 +280,21 @@ if __name__ == "__main__":
             solver=SimpleFill(fill_method=fill_method),
             name="SimpleFill_%s" % fill_method)
 
-    for k in [1, 5, 17]:
+    for k in [1, 3, 7]:
         table.add_entry(
             solver=DenseKNN(
                 k=k,
                 orientation="rows"),
             name="DenseKNN_k%d" % (k,))
 
-    for shrinkage_value in [50, 200, 800]:
+    for shrinkage_value in [25, 50, 100]:
         # SoftImpute without rank constraints
         table.add_entry(
             solver=SoftImpute(
                 shrinkage_value=shrinkage_value),
             name="SoftImpute_lambda%d" % (shrinkage_value,))
 
-    for rank in [10, 40, 160]:
+    for rank in [10, 20, 40]:
         table.add_entry(
             solver=IterativeSVD(
                 rank=rank,

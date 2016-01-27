@@ -23,17 +23,6 @@ class SoftImpute(Solver):
     Implementation of the SoftImpute algorithm from:
     "Spectral Regularization Algorithms for Learning Large Incomplete Matrices"
     by Mazumder, Hastie, and Tibshirani.
-
-
-    Basic algorithm sketch:
-    1. Initialize Z_old = 0.
-    2. Do for lambda1 > lambda2 > ... > lambdaK:
-    (a) Repeat:
-        i. Compute Z_new <- S_lambdai (Observed(X)+Missing(Z_old))
-        ii. If norm(Z_old - Z_new) / norm(Z_old) < eps: exit
-        iii. Assign Z_old = Z_new
-    (b) Assign Z[lambdai] = Z_new
-    3. Output the sequence of solutions Z[lambdai]
     """
     def __init__(
             self,

@@ -36,7 +36,7 @@ def knn_initialize(X, missing_mask, verbose=False):
     return X_row_major, D
 
 
-def knn_impute(X, missing_mask, k, verbose=False):
+def knn_impute(X, missing_mask, k, verbose=False, print_interval=100, very_large_value=10.0 ** 9):
     """
     Fill in the given incomplete matrix using k-nearest neighbor imputation.
 
@@ -67,13 +67,15 @@ def knn_impute(X, missing_mask, k, verbose=False):
     # one column at a time
     missing_mask_column_major = np.asarray(missing_mask, order="F")
     X_row_major, D = knn_initialize(X, missing_mask, verbose=verbose)
+    # D[~np.isfinite(D)] = very_large_value
     D_reciprocal = 1.0 / D
     neighbor_weights = np.zeros(k, dtype="float32")
     dot = np.dot
+    n_skipped = 0
     for i in range(n_rows):
         missing_indices = np.where(missing_mask[i])[0]
 
-        if verbose and i % 100 == 0:
+        if verbose and i % print_interval == 0:
             print(
                 "[DenseKNN] Imputing row %d/%d with %d missing columns, elapsed time: %0.3f" % (
                     i + 1,
@@ -85,18 +87,27 @@ def knn_impute(X, missing_mask, k, verbose=False):
         for j in missing_indices:
             column = X[:, j]
             rows_missing_feature = missing_mask_column_major[:, j]
-            d = d.copy()
-            d[rows_missing_feature] = np.inf
-            neighbor_indices = np.argpartition(d, k)[:k]
-            neighbor_weights = inv_d[neighbor_indices]
-            X[i, j] = (
-                dot(column[neighbor_indices], neighbor_weights) /
-                neighbor_weights.sum()
-            )
+            d_copy = d.copy()
+            # d_copy[rows_missing_feature] = very_large_value
+            d_copy[rows_missing_feature] = np.inf
+            neighbor_indices = np.argpartition(d_copy, k)[:k]
+            if len(neighbor_indices) > 0:
+                neighbor_weights = inv_d[neighbor_indices]
+                assert np.isfinite(neighbor_weights.sum()), (
+                    d, neighbor_indices, d[neighbor_indices], neighbor_weights)
+                assert np.isfinite(dot(column[neighbor_indices], neighbor_weights))
+                X[i, j] = (
+                    dot(column[neighbor_indices], neighbor_weights) /
+                    neighbor_weights.sum()
+                )
+            else:
+                n_skipped += 1
+    print(n_skipped)
+    assert False
     return X
 
 
-def knn_impute_experimental(X, missing_mask, k, verbose=False):
+def knn_impute_experimental(X, missing_mask, k, verbose=False, print_interval=100):
     """
     Fill in the given incomplete matrix using k-nearest neighbor imputation.
     This version does a lot more work in a (misguided) attempt at cleverness.
@@ -134,7 +145,7 @@ def knn_impute_experimental(X, missing_mask, k, verbose=False):
 
     for i in range(n_rows):
         missing_columns = np.where(missing_mask[i])[0]
-        if verbose and i % 100 == 0:
+        if verbose and i % print_interval == 0:
             print(
                 "[DenseKNN] Imputing row %d/%d with %d missing columns, elapsed time: %0.3f" % (
                     i + 1,
@@ -204,13 +215,19 @@ def knn_impute_experimental(X, missing_mask, k, verbose=False):
                 continue
             row_mask = observed_mask_missing_columns_sorted[:, missing_column_idx]
             sorted_column_values = X_missing_columns_sorted[:, missing_column_idx]
-            neighbor_values = sorted_column_values[row_mask][:k]
             neighbor_distances = d_sorted[row_mask][:k]
-            np.divide(1.0, neighbor_distances, out=neighbor_weights)
+
+            # may not have enough values in a column for all k neighbors
+            k_or_less = len(neighbor_distances)
+            usable_weights = neighbor_weights[:k_or_less]
+            np.divide(
+                1.0,
+                neighbor_distances, out=usable_weights)
+            neighbor_values = sorted_column_values[row_mask][:k_or_less]
+
             imputed_values[missing_column_idx] = (
-                dot(neighbor_values, neighbor_weights) /
-                neighbor_weights.sum()
-            )
+                dot(neighbor_values, usable_weights) / usable_weights.sum())
+
         X[i, missing_columns] = imputed_values
     return X
 
@@ -223,11 +240,19 @@ class DenseKNN(Solver):
     Assumes that each feature has been centered and rescaled to have
     mean 0 and variance 1.
     """
-    def __init__(self, k=5, verbose=True, orientation="rows"):
+    def __init__(
+            self,
+            k=5,
+            verbose=True,
+            orientation="rows",
+            experimental=False,
+            print_interval=100):
         Solver.__init__(self)
         self.k = k
         self.verbose = verbose
         self.orientation = orientation
+        self.experimental = experimental
+        self.print_interval = print_interval
 
     def solve(self, X, missing_mask):
         if self.orientation == "columns":
@@ -237,15 +262,21 @@ class DenseKNN(Solver):
             raise ValueError(
                 "Orientation must be either 'rows' or 'columns', got: %s" % (
                     self.orientation,))
-        X = knn_impute(
+        if self.experimental:
+            impute_fn = knn_impute_experimental
+        else:
+            impute_fn = knn_impute
+        X = impute_fn(
             X=X,
             missing_mask=missing_mask,
             k=self.k,
-            verbose=self.verbose)
+            verbose=self.verbose,
+            print_interval=self.print_interval)
         if self.orientation == "columns":
             X = X.T
         n_missing_after_imputation = np.isnan(X).sum()
         assert n_missing_after_imputation == 0, \
-            "Expected all values to be filled but got %d missing" % (
-                n_missing_after_imputation,)
+            "Expected all values to be filled but got %d/%d missing" % (
+                n_missing_after_imputation,
+                X.shape[0] * X.shape[1])
         return X

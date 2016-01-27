@@ -86,6 +86,7 @@ def all_pairs_normalized_distances(X, verbose=False):
             D[i, :] /= observed_counts_per_row
         else:
             np.logical_not(no_overlapping_features_rows[i], out=valid_rows)
+
             # add up all the non-missing squared differences
             diffs.sum(axis=1, out=ssd)
             ssd[valid_rows] /= observed_counts_per_row[valid_rows]

@@ -16,9 +16,13 @@ Helper functions for incomplete matrices represented using dictionaries.
 
 from collections import defaultdict
 
+import numpy as np
+
 from scipy.sparse import dok_matrix
 
-from .common import dense_nan_matrix
+
+def dense_nan_matrix(shape, dtype):
+    return np.ones(shape, dtype=dtype) * np.nan
 
 
 def collect_nested_keys(nested_dict):
@@ -116,24 +120,49 @@ def dense_matrix_from_nested_dictionary(
         square_result=square_result)
 
 
-def matrix_to_pair_dictionary(X, row_keys, column_keys=None):
-    if column_keys is None:
-        column_keys = row_keys
+def matrix_to_pair_dictionary(
+        X, row_keys=None, column_keys=None, filter_fn=None):
+    """
+    X : numpy.ndarray
 
+    row_keys : dict
+        Dictionary mapping indices to row names. If omitted then maps each
+        number to its string representation, such as 1 -> "1".
+
+    column_keys : dict
+        If omitted and matrix is square, then use the same dictionary
+        as the rows. Otherwise map each column index to its string form.
+
+    filter_fn : function
+        If given then only add elements for which this function returns True.
+    """
     n_rows, n_cols = X.shape
+
+    if row_keys is None:
+        row_keys = {i: i for i in range(n_rows)}
+
+    if column_keys is None:
+        if n_rows == n_cols:
+            column_keys = row_keys
+        else:
+            column_keys = {j: j for j in range(n_cols)}
 
     if len(row_keys) != n_rows:
         raise ValueError("Need %d row keys but got list of length %d" % (
             n_rows,
             len(row_keys)))
+
     if len(column_keys) != n_cols:
         raise ValueError("Need %d column keys but got list of length %d" % (
             n_cols,
             len(column_keys)))
+
     result_dict = {}
     for i, X_i in enumerate(X):
         row_key = row_keys[i]
         for j, X_ij in enumerate(X_i):
+            if filter_fn and not filter_fn(X_ij):
+                continue
             column_key = column_keys[j]
             key_pair = (row_key, column_key)
             result_dict[key_pair] = X_ij
@@ -162,11 +191,16 @@ def uncurry_nested_dictionary(curried_dict):
     return result
 
 
-def matrix_to_nested_dictionary(X, row_keys, column_keys=None):
+def matrix_to_nested_dictionary(
+        X,
+        row_keys=None,
+        column_keys=None,
+        filter_fn=None):
     pair_dict = matrix_to_pair_dictionary(
         X,
         row_keys=row_keys,
-        column_keys=column_keys)
+        column_keys=column_keys,
+        filter_fn=filter_fn)
     return curry_pair_dictionary(pair_dict)
 
 
@@ -246,3 +280,39 @@ def dense_matrix_from_pair_dictionary(
         array_fn=dense_nan_matrix,
         dtype=dtype,
         square_result=square_result)
+
+
+def transpose_nested_dictionary(nested_dict):
+    """
+    Given a nested dictionary from k1 -> k2 > value
+    transpose its outer and inner keys so it maps
+    k2 -> k1 -> value.
+    """
+    result = defaultdict(dict)
+    for k1, d in nested_dict.items():
+        for k2, v in d.items():
+            result[k2][k1] = v
+    return result
+
+
+def reverse_lookup_from_nested_dict(values_dict):
+    """
+    Create reverse-lookup dictionary mapping each row key to a list of triplets:
+    [(column key, value), ...]
+
+    Parameters
+    ----------
+    nested_values_dict : dict
+        column_key -> row_key -> value
+
+    weights_dict : dict
+        column_key -> row_key -> sample weight
+
+    Returns dictionary mapping row_key -> [(column key, value)]
+    """
+    reverse_lookup = defaultdict(list)
+    for column_key, column_dict in values_dict.items():
+        for row_key, value in column_dict.items():
+            entry = (column_key, value)
+            reverse_lookup[row_key].append(entry)
+    return reverse_lookup
