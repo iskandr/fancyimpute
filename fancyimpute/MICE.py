@@ -65,6 +65,12 @@ class MICE(Solver):
             (the latter meaning fill with random samples from the observed
             values of a column)
 
+        min_value : float
+            Minimum possible imputed value
+
+        max_value : float
+            Maximum possible imputed value
+
         verbose : boolean
     """
 
@@ -79,6 +85,8 @@ class MICE(Solver):
             add_ones=True,
             n_nearest_columns=np.infty,
             init_fill_method="mean",
+            min_value=None,
+            max_value=None,
             verbose=True):
         """
         Parameters
@@ -132,6 +140,8 @@ class MICE(Solver):
         self.add_ones = add_ones
         self.n_nearest_columns = n_nearest_columns
         self.init_fill_method = init_fill_method
+        self.min_value = min_value
+        self.max_value = max_value
         self.verbose = verbose
 
     def perform_imputation_round(
@@ -221,13 +231,14 @@ class MICE(Solver):
                     D = np.abs(col_preds_missing[:, np.newaxis] - col_preds_observed)  # distances
                     # take top k neighbors
                     k = np.minimum(self.n_pmm_neighbors, len(col_preds_observed) - 1)
-                    NN = np.argpartition(D, k, 1)[:, :k]  # <- bottleneck!
+                    k_nearest_indices = np.argpartition(D, k, 1)[:, :k]  # <- bottleneck!
                     # pick one of the nearest neighbors at random! that's right!
-                    NN_sampled = [np.random.choice(NN_row) for NN_row in NN]
+                    imputed_indices = np.array([
+                        np.random.choice(neighbor_index)
+                        for neighbor_index in k_nearest_indices])
                     # set the missing values to be the values of the nearest
                     # neighbor in the output space
-                    X_filled[missing_row_mask_for_this_col, col_idx] = \
-                        column_values_observed[NN_sampled]
+                    imputed_values = column_values_observed[imputed_indices]
                 elif self.impute_type == 'col':
                     X_other_cols_missing = X_other_cols[missing_row_mask_for_this_col]
                     # predict values for missing values using posterior predictive draws
@@ -238,7 +249,13 @@ class MICE(Solver):
                     sigmas = sigmas_squared
                     np.sqrt(sigmas_squared, out=sigmas)
                     imputed_values = np.random.normal(mus, sigmas)
-                    X_filled[missing_row_mask_for_this_col, col_idx] = imputed_values
+
+                if self.min_value is not None:
+                    imputed_values[imputed_values < self.min_value] = self.min_value
+                if self.max_value is not None:
+                    imputed_values[imputed_values > self.max_value] = self.max_value
+
+                X_filled[missing_row_mask_for_this_col, col_idx] = imputed_values
         return X_filled
 
     def initialize(self, X, missing_mask, observed_mask, visit_indices):
