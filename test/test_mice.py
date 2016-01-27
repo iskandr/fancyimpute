@@ -35,8 +35,8 @@ def test_mice_column_with_low_rank_random_matrix_approximate():
         missing_mask,
         name="MICE (impute_type=col)")
     assert missing_mae < 0.1, "Error too high with approximate column method!"
-    
-    
+
+
 def test_mice_row_with_low_rank_random_matrix_approximate():
     mice = MICE(n_imputations=100, impute_type='pmm', n_nearest_columns=5)
     XY_completed = mice.complete(XY_incomplete)

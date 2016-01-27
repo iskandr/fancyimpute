@@ -63,21 +63,28 @@ class KNN(Solver):
         if self.orientation == "columns":
             X = X.T
             missing_mask = missing_mask.T
+
         elif self.orientation != "rows":
             raise ValueError(
                 "Orientation must be either 'rows' or 'columns', got: %s" % (
                     self.orientation,))
-        X = self._impute_fn(
+
+        X_imputed = self._impute_fn(
             X=X,
             missing_mask=missing_mask,
             k=self.k,
             verbose=self.verbose,
             print_interval=self.print_interval)
-        if self.orientation == "columns":
-            X = X.T
-        n_missing_after_imputation = np.isnan(X).sum()
-        assert n_missing_after_imputation == 0, \
-            "Expected all values to be filled but got %d/%d missing" % (
+
+        failed_to_impute = np.isnan(X_imputed)
+        n_missing_after_imputation = failed_to_impute.sum()
+        if n_missing_after_imputation != 0:
+            print("[KNN] Warning: %d/%d still missing after imputation, replacing with 0" % (
                 n_missing_after_imputation,
-                X.shape[0] * X.shape[1])
-        return X
+                X.shape[0] * X.shape[1]))
+            X_imputed[failed_to_impute] = X[failed_to_impute]
+
+        if self.orientation == "columns":
+            X_imputed = X_imputed.T
+
+        return X_imputed
