@@ -11,7 +11,7 @@ from fancyimpute import (
     IterativeSVD,
     SoftImpute,
     BiScaler,
-    DenseKNN,
+    KNN,
     MICE,
     BayesianRidgeRegression,
 )
@@ -282,10 +282,10 @@ if __name__ == "__main__":
 
     for k in [1, 3, 7]:
         table.add_entry(
-            solver=DenseKNN(
+            solver=KNN(
                 k=k,
                 orientation="rows"),
-            name="DenseKNN_k%d" % (k,))
+            name="KNN_k%d" % (k,))
 
     for shrinkage_value in [25, 50, 100]:
         # SoftImpute without rank constraints

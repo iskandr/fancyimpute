@@ -10,11 +10,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from six.moves import range
-import numpy as np
 import time
 
-from .solver import Solver
+from six.moves import range
+import numpy as np
+
 from .normalized_distance import all_pairs_normalized_distances
 
 
@@ -36,7 +36,54 @@ def knn_initialize(X, missing_mask, verbose=False):
     return X_row_major, D
 
 
-def knn_impute(X, missing_mask, k, verbose=False, print_interval=100, very_large_value=10.0 ** 9):
+def knn_impute_reference(
+        X,
+        missing_mask,
+        k,
+        verbose=False,
+        print_interval=100):
+    """
+    Reference implementation of kNN imputation logic.
+    """
+    n_rows, n_cols = X.shape
+    X_result, D = knn_initialize(X, missing_mask, verbose=verbose)
+
+    # get rid of infinities, replace them with a very large number
+    finite_distance_distance_mask = np.isfinite(D)
+    effective_infinity = 10 ** 6 * D[finite_distance_distance_mask].max()
+    D[~finite_distance_distance_mask] = effective_infinity
+
+    for i in range(n_rows):
+        for j in np.where(missing_mask[i, :])[0]:
+            distances = D[i, :].copy()
+
+            # any rows that don't have the value we're currently trying
+            # to impute are set to infinite distances
+            distances[missing_mask[:, j]] = effective_infinity
+            neighbor_indices = np.argsort(distances)
+            neighbor_distances = distances[neighbor_indices]
+
+            # get rid of any infinite distance neighbors in the top k
+            valid_distances = neighbor_distances < effective_infinity
+            neighbor_distances = neighbor_distances[valid_distances][:k]
+            neighbor_indices = neighbor_indices[valid_distances][:k]
+
+            weights = 1.0 / neighbor_distances
+            weight_sum = weights.sum()
+
+            if weight_sum > 0:
+                column = X[:, j]
+                values = column[neighbor_indices]
+                X_result[i, j] = np.dot(values, weights) / weight_sum
+    return X_result
+
+
+def knn_impute_with_argpartition(
+        X,
+        missing_mask,
+        k,
+        verbose=False,
+        print_interval=100):
     """
     Fill in the given incomplete matrix using k-nearest neighbor imputation.
 
@@ -58,8 +105,7 @@ def knn_impute(X, missing_mask, k, verbose=False, print_interval=100, very_large
 
     verbose : bool
 
-    Modifies X by replacing its missing values with weighted averages of
-    similar rows. Returns the modified X.
+    Returns a row-major copy of X with imputed values.
     """
     start_t = time.time()
     n_rows, n_cols = X.shape
@@ -71,13 +117,12 @@ def knn_impute(X, missing_mask, k, verbose=False, print_interval=100, very_large
     D_reciprocal = 1.0 / D
     neighbor_weights = np.zeros(k, dtype="float32")
     dot = np.dot
-    n_skipped = 0
     for i in range(n_rows):
         missing_indices = np.where(missing_mask[i])[0]
 
         if verbose and i % print_interval == 0:
             print(
-                "[DenseKNN] Imputing row %d/%d with %d missing columns, elapsed time: %0.3f" % (
+                "Imputing row %d/%d with %d missing columns, elapsed time: %0.3f" % (
                     i + 1,
                     n_rows,
                     len(missing_indices),
@@ -93,24 +138,25 @@ def knn_impute(X, missing_mask, k, verbose=False, print_interval=100, very_large
             neighbor_indices = np.argpartition(d_copy, k)[:k]
             if len(neighbor_indices) > 0:
                 neighbor_weights = inv_d[neighbor_indices]
-                assert np.isfinite(neighbor_weights.sum()), (
-                    d, neighbor_indices, d[neighbor_indices], neighbor_weights)
-                assert np.isfinite(dot(column[neighbor_indices], neighbor_weights))
-                X[i, j] = (
+                X_row_major[i, j] = (
                     dot(column[neighbor_indices], neighbor_weights) /
                     neighbor_weights.sum()
                 )
-            else:
-                n_skipped += 1
-    print(n_skipped)
-    assert False
-    return X
+    return X_row_major
 
 
-def knn_impute_experimental(X, missing_mask, k, verbose=False, print_interval=100):
+def knn_impute_optimistic(
+        X,
+        missing_mask,
+        k,
+        verbose=False, print_interval=100):
     """
     Fill in the given incomplete matrix using k-nearest neighbor imputation.
-    This version does a lot more work in a (misguided) attempt at cleverness.
+
+    This version assumes that most of the time the same neighbors will be
+    used so first performs the weighted average of a row's k-nearest neighbors
+    and checks afterward whether it was valid (due to possible missing values).
+
     Has been observed to be a lot faster for 1/4 missing images matrix
     with 1000 rows and ~9000 columns.
 
@@ -232,51 +278,77 @@ def knn_impute_experimental(X, missing_mask, k, verbose=False, print_interval=10
     return X
 
 
-class DenseKNN(Solver):
+def knn_impute_few_observed(
+        X, missing_mask, k, verbose=False, print_interval=100):
     """
-    k-Nearest Neighbors Imputation for arrays with missing data.
-    Works only on dense arrays with a moderate number of rows.
+    Seems to be the fastest kNN implementation. Pre-sorts each rows neighbors
+    and then filters these sorted indices using each columns mask of
+    observed values.
 
-    Assumes that each feature has been centered and rescaled to have
-    mean 0 and variance 1.
+    Important detail: If k observed values are not available then uses fewer
+    than k neighboring rows.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        Matrix to fill of shape (n_samples, n_features)
+
+    missing_mask : np.ndarray
+        Boolean array of same shape as X
+
+    k : int
+
+    verbose : bool
     """
-    def __init__(
-            self,
-            k=5,
-            verbose=True,
-            orientation="rows",
-            experimental=False,
-            print_interval=100):
-        Solver.__init__(self)
-        self.k = k
-        self.verbose = verbose
-        self.orientation = orientation
-        self.experimental = experimental
-        self.print_interval = print_interval
+    start_t = time.time()
+    n_rows, n_cols = X.shape
+    # put the missing mask in column major order since it's accessed
+    # one column at a time
+    missing_mask_column_major = np.asarray(missing_mask, order="F")
+    observed_mask_column_major = ~missing_mask_column_major
+    X_column_major = X.copy(order="F")
+    X_row_major, D = knn_initialize(X, missing_mask, verbose=verbose)
+    # get rid of infinities, replace them with a very large number
+    finite_distance_distance_mask = np.isfinite(D)
+    effective_infinity = 10 ** 6 * D[finite_distance_distance_mask].max()
+    D[~finite_distance_distance_mask] = effective_infinity
+    D_sorted = np.argsort(D, axis=1)
+    inv_D = 1.0 / D
+    D_valid_mask = D < effective_infinity
+    valid_distances_per_row = D_valid_mask.sum(axis=1)
 
-    def solve(self, X, missing_mask):
-        if self.orientation == "columns":
-            X = X.T
-            missing_mask = missing_mask.T
-        elif self.orientation != "rows":
-            raise ValueError(
-                "Orientation must be either 'rows' or 'columns', got: %s" % (
-                    self.orientation,))
-        if self.experimental:
-            impute_fn = knn_impute_experimental
-        else:
-            impute_fn = knn_impute
-        X = impute_fn(
-            X=X,
-            missing_mask=missing_mask,
-            k=self.k,
-            verbose=self.verbose,
-            print_interval=self.print_interval)
-        if self.orientation == "columns":
-            X = X.T
-        n_missing_after_imputation = np.isnan(X).sum()
-        assert n_missing_after_imputation == 0, \
-            "Expected all values to be filled but got %d/%d missing" % (
-                n_missing_after_imputation,
-                X.shape[0] * X.shape[1])
-        return X
+    # trim the number of other rows we consider to exclude those
+    # with infinite distances
+    D_sorted = [
+        D_sorted[i, :count]
+        for i, count in enumerate(valid_distances_per_row)
+    ]
+
+    dot = np.dot
+    for i in range(n_rows):
+        missing_row = missing_mask[i, :]
+        missing_indices = np.where(missing_row)[0]
+        row_weights = inv_D[i, :]
+        # row_sorted_indices = D_sorted_indices[i]
+        if verbose and i % print_interval == 0:
+            print(
+                "Imputing row %d/%d with %d missing columns, elapsed time: %0.3f" % (
+                    i + 1,
+                    n_rows,
+                    len(missing_indices),
+                    time.time() - start_t))
+        # row_neighbor_indices = neighbor_indices[i]
+        candidate_neighbor_indices = D_sorted[i]
+
+        for j in missing_indices:
+            observed = observed_mask_column_major[:, j]
+            sorted_observed = observed[candidate_neighbor_indices]
+            observed_neighbor_indices = candidate_neighbor_indices[sorted_observed]
+            k_nearest_indices = observed_neighbor_indices[:k]
+            weights = row_weights[k_nearest_indices]
+            weight_sum = weights.sum()
+            if weight_sum > 0:
+                column = X_column_major[:, j]
+                values = column[k_nearest_indices]
+                X_row_major[i, j] = dot(values, weights) / weight_sum
+    return X_row_major
