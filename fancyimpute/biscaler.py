@@ -152,7 +152,9 @@ class BiScaler(object):
             X_centered ** 2 / (column_scales ** 2).reshape((1, n_cols)),
             axis=1)
         row_variances[row_variances == 0] = 1.0
-        assert len(row_variances) == n_rows
+        assert len(row_variances) == n_rows, "%d != %d" % (
+            len(row_variances),
+            n_rows)
         return np.sqrt(row_variances)
 
     def estimate_column_scales(
@@ -178,7 +180,9 @@ class BiScaler(object):
             X_centered ** 2 / (row_scales ** 2).reshape((n_rows, 1)),
             axis=0)
         column_variances[column_variances == 0] = 1.0
-        assert len(column_variances) == n_cols
+        assert len(column_variances) == n_cols, "%d != %d" % (
+            len(column_variances),
+            n_cols)
         return np.sqrt(column_variances)
 
     def residual(self, X_normalized):
@@ -190,14 +194,17 @@ class BiScaler(object):
         if self.center_columns:
             column_means = np.nanmean(X_normalized, axis=0)
             total += (column_means ** 2).sum()
+
         if self.scale_rows:
             row_variances = np.nanvar(X_normalized, axis=1)
             row_variances[row_variances == 0] = 1.0
             total += (np.log(row_variances) ** 2).sum()
+
         if self.scale_columns:
             column_variances = np.nanvar(X_normalized, axis=0)
             column_variances[column_variances == 0] = 1.0
             total += (np.log(column_variances) ** 2).sum()
+
         return total
 
     def clamp(self, X, inplace=False):
@@ -248,17 +255,34 @@ class BiScaler(object):
             column_scales = np.nanstd(X, axis=0)
             column_scales[column_scales == 0] = 1.0
         else:
-            column_scales = np.ones(n_rows, dtype=dtype)
+            column_scales = np.ones(n_cols, dtype=dtype)
 
         last_residual = self.residual(X)
         if self.verbose:
             print("[BiScaler] Initial log residual value = %f" % (
                 np.log(last_residual),))
         for i in range(self.max_iters):
-            assert len(column_means) == n_cols
-            assert len(column_scales) == n_cols
-            assert len(row_means) == n_rows
-            assert len(row_scales) == n_rows
+            if last_residual == 0:
+                # already have a perfect fit, so let's get out of here
+                print("[BiScaler] No room for improvement")
+                break
+
+            assert len(column_means) == n_cols, \
+                "Wrong number of column means, expected %d but got %d" % (
+                    n_cols,
+                    len(column_means))
+            assert len(column_scales) == n_cols, \
+                "Wrong number of column scales, expected %d but got %d" % (
+                    n_cols,
+                    len(column_scales))
+            assert len(row_means) == n_rows, \
+                "Wrong number of row means, expected %d but got %d" % (
+                    n_rows,
+                    len(row_means))
+            assert len(row_scales) == n_rows, \
+                "Wrong number of row scales, expected %d but got %d" % (
+                    n_rows,
+                    len(row_scales))
 
             if self.center_rows:
                 row_means = self.estimate_row_means(
