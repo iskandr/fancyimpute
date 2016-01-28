@@ -10,10 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import, print_function, division
 from collections import defaultdict
 
 import numpy as np
-
 
 from .dictionary_helpers import (
     collect_nested_keys,

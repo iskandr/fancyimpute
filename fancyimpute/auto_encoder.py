@@ -14,6 +14,7 @@ from __future__ import absolute_import, print_function, division
 from collections import deque
 
 import numpy as np
+from six.moves import range
 
 from .neuralnet_helpers import make_network
 from .common import masked_mae

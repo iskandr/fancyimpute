@@ -13,6 +13,7 @@
 from __future__ import absolute_import, print_function, division
 from time import time
 
+from six.moves import range
 import numpy as np
 
 from .bayesian_ridge_regression import BayesianRidgeRegression

@@ -10,7 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import, print_function, division
+
 import numpy as np
+from six.moves import range
 
 from .common import generate_random_column_samples
 

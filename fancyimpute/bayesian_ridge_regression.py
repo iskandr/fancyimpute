@@ -12,6 +12,7 @@
 
 from __future__ import absolute_import, print_function, division
 
+from six.moves import range
 from numpy import dot, append, column_stack, ones
 from numpy.linalg import norm, inv, multi_dot
 from numpy.random import multivariate_normal
