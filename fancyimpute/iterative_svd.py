@@ -63,6 +63,7 @@ class IterativeSVD(Solver):
             tsvd = TruncatedSVD(curr_rank, algorithm=self.svd_algorithm)
             X_reduced = tsvd.fit_transform(X_filled)
             X_reconstructed = tsvd.inverse_transform(X_reduced)
+            X_reconstructed = self.clip(X_reconstructed)
             mae = masked_mae(
                 X_true=X,
                 X_pred=X_reconstructed,

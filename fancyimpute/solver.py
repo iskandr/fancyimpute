@@ -122,19 +122,26 @@ class Solver(object):
         X /= column_scales
         return X, column_centers, column_scales
 
-    def project_result(self, X):
+    def clip(self, X):
         """
         Clip values to fall within any global or column-wise min/max constraints
         """
         X = np.asarray(X)
-
-        if self.normalizer is not None:
-            X = self.normalizer.inverse_transform(X)
         if self.min_value is not None:
             X[X < self.min_value] = self.min_value
         if self.max_value is not None:
             X[X > self.max_value] = self.max_value
         return X
+
+    def project_result(self, X):
+        """
+        First undo normaliztion and then clip to the user-specified min/max
+        range.
+        """
+        X = np.asarray(X)
+        if self.normalizer is not None:
+            X = self.normalizer.inverse_transform(X)
+        return self.clip(X)
 
     def solve(self, X, missing_mask):
         """

@@ -131,17 +131,19 @@ class MICE(Solver):
 
         verbose : boolean
         """
+        Solver.__init__(
+            self,
+            n_imputations=n_imputations,
+            min_value=min_value,
+            max_value=max_value,
+            fill_method=init_fill_method)
         self.visit_sequence = visit_sequence
-        self.n_imputations = n_imputations
         self.n_burn_in = n_burn_in
         self.n_pmm_neighbors = n_pmm_neighbors
         self.impute_type = impute_type
         self.model = model
         self.add_ones = add_ones
         self.n_nearest_columns = n_nearest_columns
-        self.init_fill_method = init_fill_method
-        self.min_value = min_value
-        self.max_value = max_value
         self.verbose = verbose
 
     def perform_imputation_round(
@@ -249,12 +251,7 @@ class MICE(Solver):
                     sigmas = sigmas_squared
                     np.sqrt(sigmas_squared, out=sigmas)
                     imputed_values = np.random.normal(mus, sigmas)
-
-                if self.min_value is not None:
-                    imputed_values[imputed_values < self.min_value] = self.min_value
-                if self.max_value is not None:
-                    imputed_values[imputed_values > self.max_value] = self.max_value
-
+                imputed_values = self.clip(imputed_values)
                 X_filled[missing_row_mask_for_this_col, col_idx] = imputed_values
         return X_filled
 
@@ -273,12 +270,14 @@ class MICE(Solver):
                 column = X_filled[:, col_idx]
                 observed_column = column[observed_row_mask_for_col]
 
-                if self.init_fill_method == "mean":
+                if self.fill_method == "mean":
                     fill_values = np.mean(observed_column)
-                elif self.init_fill_method == "median":
+                elif self.fill_method == "median":
                     fill_values = np.median(observed_column)
-                else:
+                elif self.fill_method == "random":
                     fill_values = np.random.choice(observed_column, n_missing)
+                else:
+                    raise ValueError("Invalid fill method %s" % self.fill_method)
                 X_filled[missing_mask_col, col_idx] = fill_values
         return X_filled
 
