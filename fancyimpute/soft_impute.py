@@ -149,6 +149,11 @@ class SoftImpute(Solver):
                 shrinkage_value,
                 max_rank=self.max_rank)
 
+            if self.min_value is not None:
+                X[X < self.min_value] = self.min_value
+            if self.max_value is not None:
+                X[X > self.max_value] = self.max_value
+
             # print error on observed data
             if self.verbose:
                 mae = masked_mae(
