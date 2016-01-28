@@ -107,11 +107,14 @@ class BayesianRidgeRegression(object):
         """
         return multivariate_normal(self.beta_estimate, self.covar, num_draws)
 
-    def predict_dist(self, X):
+    def predict_dist(self, X, eps=0.00001):
         """
         Returns the mean and variance of the posterior predictive distribution
         For reference, see page #2 of:
         https://www.cs.utah.edu/~fletcher/cs6957/lectures/BayesianLinearRegression.pdf
+
+        The parameter `eps` prevents collapse of the variances to 0 by
+        clamping them to this minimum value.
         """
         if self.add_ones:
             X_ones = self.add_column_of_ones(X)
@@ -123,8 +126,8 @@ class BayesianRidgeRegression(object):
         X_dot_covar *= X_ones
         sigmas_squared = X_dot_covar.sum(axis=1)
         sigmas_squared += self.sigma_squared_estimate
-        if sigmas_squared.min() <= 0:
+        if sigmas_squared.min() <= eps:
             # keep the variance from collapsing completely or in some
             # strange cases turning negative
-            sigmas_squared[sigmas_squared <= 0] = 0.00001
+            sigmas_squared[sigmas_squared <= eps] = eps
         return mus, sigmas_squared
