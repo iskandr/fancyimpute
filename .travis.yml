@@ -28,6 +28,9 @@ addons:
     # install pandoc for use with pypandoc for converting the README
     # from markdown to RST
     - pandoc
+    # need BLAS and LAPACK
+    - liblapack-dev
+    - libatlas-base-dev
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
