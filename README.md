@@ -9,16 +9,11 @@ A variety of matrix completion and imputation algorithms implemented in Python.
 ```python
 from fancyimpute import BiScaler, KNN, NuclearNormMinimization, SoftImpute
 
-# X is a data matrix which we're going to randomly drop entries from
-missing_mask = np.random.randn(*X.shape) > 0
-X_incomplete = X.copy()
-# missing entries indicated with NaN
-X_incomplete[missing_mask] = np.nan
-
+# X is the complete data matrix
+# X_incomplete has the same values as X except a subset have been replace with NaN
 
 # Use 3 nearest rows which have a feature to fill in each row's missing features
-knnImpute = KNN(k=3)
-X_filled_knn = knnImpute.complete(X_incomplete)
+X_filled_knn = KNN(k=3).complete(X_incomplete)
 
 # matrix completion using convex optimization to find low-rank solution
 # that still matches observed values. Slow!
@@ -26,17 +21,7 @@ X_filled_nnm = NuclearNormMinimization().complete(X_incomplete)
 
 # Instead of solving the nuclear norm objective directly, instead
 # induce sparsity using singular value thresholding
-softImpute = SoftImpute()
-
-# simultaneously normalizes the rows and columns of your observed data,
-# sometimes useful for low-rank imputation methods
-biscaler = BiScaler()
-
-# rescale both rows and columns to have zero mean and unit variance
-X_incomplete_normalized = biscaler.fit_transform(X_incomplete)
-
-X_filled_softimpute_normalized = softImpute.complete(X_incomplete_normalized)
-X_filled_softimpute = biscaler.inverse_transform(X_filled_softimpute_normalized)
+X_filled_softimpute = SoftImpute().complete(X_incomplete_normalized)
 
 # print mean squared error for the three imputation methods above
 nnm_mse = ((X_filled_nnm[missing_mask] - X[missing_mask]) ** 2).mean()
