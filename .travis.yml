@@ -3,7 +3,9 @@ language: python
 python:
   - "2.7"
   - "3.4"
-  - "3.5"
+  # Wish I could use Python 3.5 but cvxpy fails to install due to the
+  # multiprocess package. No idea why!
+  # - "3.5"
 before_install:
   # Commands below copied from: http://conda.pydata.org/docs/travis.html
   # We do this conditionally because it saves us some downloading if the
@@ -33,7 +35,7 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy=1.10 scipy nose pandas matplotlib cvxopt cvxpy theano scikit-learn
+      numpy=1.10 scipy nose pandas matplotlib cvxopt theano scikit-learn
   - source activate test-environment
   - pip install pypandoc
   - pip install -r requirements.txt

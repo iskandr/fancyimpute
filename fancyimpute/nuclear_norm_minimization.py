@@ -28,9 +28,31 @@ class NuclearNormMinimization(Solver):
             require_symmetric_solution=False,
             min_value=None,
             max_value=None,
-            error_tolerance=0.0,
+            error_tolerance=0.0001,
             fast_but_approximate=True,
             verbose=True):
+        """
+        Parameters
+        ----------
+        require_symmetric_solution : bool
+            Add symmetry constraint to convex problem
+
+        min_value : float
+            Smallest possible imputed value
+
+        max_value : float
+            Largest possible imputed value
+
+        error_tolerance : bool
+            Degree of error allowed on reconstructed values. If omitted then
+            defaults to 0.0001
+
+        fast_but_approximate : bool
+            Use the faster but less accurate Splitting Cone Solver
+
+        verbose : bool
+            Print debug info
+        """
         Solver.__init__(
             self,
             min_value=min_value,

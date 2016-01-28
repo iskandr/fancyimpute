@@ -2,3 +2,4 @@ six
 keras
 downhill
 climate
+cvxpy

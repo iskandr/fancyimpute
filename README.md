@@ -7,9 +7,7 @@ A variety of matrix completion and imputation algorithms implemented in Python.
 ## Usage
 
 ```python
-from fancyimpute import (NuclearNormMinimization, BiScaler, DenseKNN)
-
-biscaler = BiScaler()
+from fancyimpute import BiScaler, KNN, NuclearNormMinimization, SoftImpute
 
 # X is a data matrix which we're going to randomly drop entries from
 missing_mask = np.random.randn(*X.shape) > 0
@@ -17,16 +15,38 @@ X_incomplete = X.copy()
 # missing entries indicated with NaN
 X_incomplete[missing_mask] = np.nan
 
+
+# Use 3 nearest rows which have a feature to fill in each row's missing features
+knnImpute = KNN(k=3)
+X_filled_knn = knnImpute.complete(X_incomplete)
+
+# matrix completion using convex optimization to find low-rank solution
+# that still matches observed values. Slow!
+X_filled_nnm = NuclearNormMinimization().complete(X_incomplete)
+
+# Instead of solving the nuclear norm objective directly, instead
+# induce sparsity using singular value thresholding
+softImpute = SoftImpute()
+
+# simultaneously normalizes the rows and columns of your observed data,
+# sometimes useful for low-rank imputation methods
+biscaler = BiScaler()
+
 # rescale both rows and columns to have zero mean and unit variance
 X_incomplete_normalized = biscaler.fit_transform(X_incomplete)
 
-# use 3 nearest rows which have a feature to fill in each row's missing features
-knn_solver = KNN(k=3)
-X_filled_normalized = knn_solver.complete(X_incomplete)
-X_filled = biscaler.inverse_transform(X_knn_normalized)
+X_filled_softimpute_normalized = softImpute.complete(X_incomplete_normalized)
+X_filled_softimpute = biscaler.inverse_transform(X_filled_softimpute_normalized)
 
-mse = ((X_filled[missing_mask] - X[missing_mask]) ** 2).mean()
-print("MSE of reconstruction: %f" % mse)
+# print mean squared error for the three imputation methods above
+nnm_mse = ((X_filled_knn[missing_mask] - X[missing_mask]) ** 2).mean()
+print("Nuclear norm minimization MSE: %f" % nnm_mse)
+
+softImpute_mse = ((X_filled_softimpute[missing_mask] - X[missing_mask]) ** 2).mean()
+print("SoftImpute MSE: %f" % softImpute_mse)
+
+knn_mse = ((X_filled_knn[missing_mask] - X[missing_mask]) ** 2).mean()
+print("knnImpute MSE: %f" % knn_mse)
 ```
 
 ## Algorithms
