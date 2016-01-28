@@ -358,6 +358,8 @@ class MICE(Solver):
         return np.array(results_list), missing_mask
 
     def complete(self, X):
+        if self.verbose:
+            print("[MICE] Completing matrix with shape %s" % (X.shape,))
         X_completed = X.copy()
         imputed_arrays, missing_mask = self.multiple_imputations(X)
         # average the imputed values for each feature
