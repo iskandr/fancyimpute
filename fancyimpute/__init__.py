@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 
-
 from .solver import Solver
 from .nuclear_norm_minimization import NuclearNormMinimization
 from .bayesian_ridge_regression import BayesianRidgeRegression
