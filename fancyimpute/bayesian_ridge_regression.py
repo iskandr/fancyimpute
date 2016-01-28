@@ -123,4 +123,8 @@ class BayesianRidgeRegression(object):
         X_dot_covar *= X_ones
         sigmas_squared = X_dot_covar.sum(axis=1)
         sigmas_squared += self.sigma_squared_estimate
+        if sigmas_squared.min() <= 0:
+            # keep the variance from collapsing completely or in some
+            # strange cases turning negative
+            sigmas_squared[sigmas_squared <= 0] = 0.00001
         return mus, sigmas_squared
