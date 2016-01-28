@@ -1,5 +1,5 @@
 six
-numpy>=1.7
+numpy>=1.10
 scipy
 cvxpy
 scikit-learn

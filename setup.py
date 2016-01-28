@@ -52,7 +52,8 @@ if __name__ == '__main__':
         ],
         install_requires=[
             'six',
-            'numpy>=1.7',
+            # need at least 1.10 for np.multi_dot
+            'numpy>=1.10',
             'scipy',
             # used by NuclearNormMinimization
             'cvxpy',
