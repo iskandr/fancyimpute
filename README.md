@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/hammerlab/fancyimpute.svg?branch=master)](https://travis-ci.org/hammerlab/fancyimpute) [![Coverage Status](https://coveralls.io/repos/hammerlab/fancyimpute/badge.svg?branch=master&service=github)](https://coveralls.io/github/hammerlab/fancyimpute?branch=master)
+
 # fancyimpute
 
 A variety of matrix completion and imputation algorithms implemented in Python.
