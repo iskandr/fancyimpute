@@ -29,6 +29,20 @@ class Solver(object):
         self.max_value = max_value
         self.normalizer = normalizer
 
+    def __repr__(self):
+        return str(self)
+
+    def __str__(self):
+        field_list = []
+        for (k, v) in sorted(self.__dict__.items()):
+            if v is None or isinstance(v, (float, int)):
+                field_list.append("%s=%s" % (k, v))
+            elif isinstance(v, str):
+                field_list.append("%s='%s'" % (k, v))
+        return "%s(%s)" % (
+            self.__class__.__name__,
+            ", ".join(field_list))
+
     def _check_input(self, X):
         if len(X.shape) != 2:
             raise ValueError("Expected 2d matrix, got %s array" % (X.shape,))
