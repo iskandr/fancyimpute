@@ -39,7 +39,7 @@ X_filled_softimpute_normalized = softImpute.complete(X_incomplete_normalized)
 X_filled_softimpute = biscaler.inverse_transform(X_filled_softimpute_normalized)
 
 # print mean squared error for the three imputation methods above
-nnm_mse = ((X_filled_knn[missing_mask] - X[missing_mask]) ** 2).mean()
+nnm_mse = ((X_filled_nnm[missing_mask] - X[missing_mask]) ** 2).mean()
 print("Nuclear norm minimization MSE: %f" % nnm_mse)
 
 softImpute_mse = ((X_filled_softimpute[missing_mask] - X[missing_mask]) ** 2).mean()
