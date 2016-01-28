@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/hammerlab/fancyimpute.svg?branch=master)](https://travis-ci.org/hammerlab/fancyimpute) [![Coverage Status](https://coveralls.io/repos/hammerlab/fancyimpute/badge.svg?branch=master&service=github)](https://coveralls.io/github/hammerlab/fancyimpute?branch=master)
+[![Build Status](https://travis-ci.org/hammerlab/fancyimpute.svg?branch=master)](https://travis-ci.org/hammerlab/fancyimpute) [![Coverage Status](https://coveralls.io/repos/github/hammerlab/fancyimpute/badge.svg?branch=master)](https://coveralls.io/github/hammerlab/fancyimpute?branch=master)
 
 # fancyimpute
 
