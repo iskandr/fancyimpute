@@ -28,13 +28,13 @@ addons:
     # install pandoc for use with pypandoc for converting the README
     # from markdown to RST
     - pandoc
-    # need BLAS and LAPACK
-    - liblapack-dev
-    - libatlas-base-dev
+    # If can't get cvxopt installed via conda then might need BLAS and LAPACK
+    # - liblapack-dev
+    # - libatlas-base-dev
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy scipy nose pandas matplotlib
+      numpy scipy nose pandas matplotlib cvxopt theano
   - source activate test-environment
   - pip install pypandoc
   - pip install -r requirements.txt
