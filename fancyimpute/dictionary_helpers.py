@@ -56,6 +56,13 @@ def flattened_nested_key_indices(nested_dict):
     return {k: i for (i, k) in enumerate(combined_keys)}
 
 
+def index_dict_to_sorted_list(key_indices):
+    sorted_list = [None] * len(key_indices)
+    for (key, index) in key_indices.items():
+        sorted_list[index] = key
+    return sorted_list
+
+
 def array_from_nested_dictionary(
         nested_dict,
         array_fn,
@@ -76,8 +83,7 @@ def array_from_nested_dictionary(
     square_result : bool
         Combine keys from outer and inner dictionaries.
 
-    Returns array and two dictionaries mapping keys from the outer/inner arrays
-    to indices in the returned array.
+    Returns array and sorted lists of the outer and inner keys.
     """
     if square_result:
         outer_key_indices = inner_key_indices = flattened_nested_key_indices(
@@ -95,7 +101,9 @@ def array_from_nested_dictionary(
         for inner_key, value in sub_dictionary.items():
             j = inner_key_indices[inner_key]
             result[i, j] = value
-    return result, outer_key_indices, inner_key_indices
+    outer_key_list = index_dict_to_sorted_list(outer_key_indices)
+    inner_key_list = index_dict_to_sorted_list(inner_key_indices)
+    return result, outer_key_list, inner_key_list
 
 
 def sparse_dok_matrix_from_nested_dictionary(
@@ -209,7 +217,7 @@ def pair_dict_key_sets(pair_dict):
     column_keys = set([])
     for (row_key, column_key) in pair_dict.keys():
         row_keys.add(row_key)
-        column_keys.add(column_keys)
+        column_keys.add(column_key)
     return row_keys, column_keys
 
 
@@ -236,18 +244,21 @@ def array_from_pair_dictionary(
     square_result : bool
         Combine keys from rows and columns
 
-    Returns array and dictionaries mapping row/column keys to indices.
+    Returns array and sorted lists of the row and column keys.
     """
-    row_keys, column_keys = pair_dict_key_sets(pair_dict)
+    row_key_set, column_key_set = pair_dict_key_sets(pair_dict)
 
     if square_result:
-        keys = row_keys.union(column_keys)
-        key_list = list(sorted(keys))
-        row_key_indices = column_key_indices = {k: i for (i, k) in key_list}
+        combined_key_set = row_key_set.union(column_key_set)
+        row_key_list = column_key_list = list(sorted(combined_key_set))
+        row_key_indices = column_key_indices = {
+            k: i for (i, k) in enumerate(row_key_list)
+        }
     else:
-        row_keys = list(sorted(row_keys))
-        row_key_indices = {k: i for (i, k) in row_keys}
-        column_key_indices = {k: i for (i, k) in column_keys}
+        row_key_list = list(sorted(row_key_set))
+        column_key_list = list(sorted(column_key_set))
+        row_key_indices = {k: i for (i, k) in enumerate(row_key_list)}
+        column_key_indices = {k: i for (i, k) in enumerate(column_key_list)}
 
     n_rows = len(row_key_indices)
     n_cols = len(column_key_indices)
@@ -255,9 +266,9 @@ def array_from_pair_dictionary(
     result = array_fn(shape, dtype)
     for (row_key, column_key), value in pair_dict.items():
         i = row_key_indices[row_key]
-        j = column_key_indices[column_keys]
+        j = column_key_indices[column_key]
         result[i, j] = value
-    return result, row_key_indices, column_key_indices
+    return result, row_key_list, column_key_list
 
 
 def sparse_dok_matrix_from_pair_dictionary(
