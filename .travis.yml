@@ -44,5 +44,5 @@ install:
 script:
   - nosetests test --with-coverage --cover-package=fancyimpute
 after_success:
-  coveralls
+  - coveralls
 
