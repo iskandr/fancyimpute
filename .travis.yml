@@ -45,6 +45,7 @@ install:
   - pip install git+git://github.com/Theano/Theano.git --upgrade --no-deps
   - pip install .
   - pip install coveralls
+  - export PACKAGE_DIR=`pwd`
   # try installing SCS from github
   - git clone https://github.com/cvxgrp/scs.git
   - cd scs
@@ -52,6 +53,7 @@ install:
   - cd python
   - python setup.py install
 script:
+  - cd $PACKAGE_DIR
   - nosetests test --with-coverage --cover-package=fancyimpute
 after_success:
   - coveralls
