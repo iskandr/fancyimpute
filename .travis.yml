@@ -43,10 +43,14 @@ install:
   - pip install -r requirements.txt
   # install the latest Theano
   - pip install git+git://github.com/Theano/Theano.git --upgrade --no-deps
-  # try installing SCS from github
-  - pip install git+git://github.com/cvxgrp/scs.git --upgrade --no-deps
   - pip install .
   - pip install coveralls
+  # try installing SCS from github
+  - git clone https://github.com/cvxgrp/scs.git
+  - cd scs
+  - make
+  - cd python
+  - python setup.py install
 script:
   - nosetests test --with-coverage --cover-package=fancyimpute
 after_success:
