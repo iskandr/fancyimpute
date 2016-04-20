@@ -36,6 +36,8 @@ install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
       numpy=1.10 scipy nose pandas matplotlib cvxopt theano scikit-learn
+  # install SCS solver for cvxpy
+  - conda install -c https://conda.anaconda.org/omnia scs
   - source activate test-environment
   - pip install pypandoc
   - pip install -r requirements.txt
