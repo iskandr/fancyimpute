@@ -1,5 +1,5 @@
 six
-keras
+keras<1.0
 downhill
 climate
 cvxpy
