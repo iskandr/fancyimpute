@@ -309,6 +309,7 @@ class MICE(Solver):
         belong in X.
         """
         start_t = time()
+        X = np.asarray(X)
         self._check_input(X)
         missing_mask = np.isnan(X)
         self._check_missing_value_mask(missing_mask)
