@@ -59,7 +59,7 @@ if __name__ == '__main__':
             'cvxpy',
             'scikit-learn',
             # used by AutoEncoder
-            'keras<1.0',
+            'keras',
             # used by MatrixFactorization
             'downhill',
             'climate',
