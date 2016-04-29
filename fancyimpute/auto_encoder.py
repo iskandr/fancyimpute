@@ -106,9 +106,7 @@ class AutoEncoder(Solver):
             batch_start = batch_idx * self.batch_size
             batch_end = (batch_idx + 1) * self.batch_size
             batch_data = X_shuffled[batch_start:batch_end, :]
-            self.network.train_on_batch(
-                X=batch_data,
-                y=batch_data)
+            self.network.train_on_batch(batch_data, batch_data)
         return self.network.predict(X_with_missing_mask)
 
     def _get_training_params(self, n_samples):
