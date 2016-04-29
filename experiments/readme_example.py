@@ -1,5 +1,11 @@
 import numpy as np
-from fancyimpute import BiScaler, KNN, NuclearNormMinimization, SoftImpute, SimpleFill
+from fancyimpute import (
+    BiScaler,
+    KNN,
+    NuclearNormMinimization,
+    SoftImpute,
+    SimpleFill
+)
 
 n = 200
 m = 20
