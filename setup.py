@@ -35,7 +35,7 @@ except:
 if __name__ == '__main__':
     setup(
         name='fancyimpute',
-        version="0.0.10",
+        version="0.0.11",
         description="Matrix completion and feature imputation algorithms",
         author="Alex Rubinsteyn and Sergey Feldman",
         author_email="alex {dot} rubinsteyn {at} mssm {dot} edu",
