@@ -22,7 +22,7 @@ from .common import masked_mae
 class IterativeSVD(Solver):
     def __init__(
             self,
-            rank,
+            rank=10,
             convergence_threshold=0.00001,
             max_iters=200,
             gradual_rank_increase=True,
