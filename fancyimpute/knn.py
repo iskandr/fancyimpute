@@ -28,19 +28,21 @@ class KNN(Solver):
     def __init__(
             self,
             k=5,
-            verbose=True,
             orientation="rows",
             use_argpartition=False,
-            print_interval=100):
+            print_interval=100,
+            min_value=None,
+            max_value=None,
+            verbose=True):
         """
         Parameters
         ----------
         k : int
             Number of neighboring rows to use for imputation.
 
-        verbose : bool
-
         orientation : str
+            Which axis of the input matrix should be treated as a sample
+            (default is "rows" but can also be "columns")
 
         use_argpartition : bool
            Use a more naive implementation of kNN imputation whichs calls
@@ -48,9 +50,17 @@ class KNN(Solver):
            than k neighbors are available for a missing value.
 
         print_interval : int
+
+        min_value : float
+            Minimum possible imputed value
+
+        max_value : float
+            Maximum possible imputed value
+
+        verbose : bool
         """
 
-        Solver.__init__(self)
+        Solver.__init__(self, min_value=min_value, max_value=max_value)
         self.k = k
         self.verbose = verbose
         self.orientation = orientation
