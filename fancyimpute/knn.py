@@ -33,6 +33,7 @@ class KNN(Solver):
             print_interval=100,
             min_value=None,
             max_value=None,
+            normalizer=None,
             verbose=True):
         """
         Parameters
@@ -57,10 +58,16 @@ class KNN(Solver):
         max_value : float
             Maximum possible imputed value
 
+        normalizer : object
+            Any object (such as BiScaler) with fit() and transform() methods
+
         verbose : bool
         """
-
-        Solver.__init__(self, min_value=min_value, max_value=max_value)
+        Solver.__init__(
+            self,
+            min_value=min_value,
+            max_value=max_value,
+            normalizer=normalizer)
         self.k = k
         self.verbose = verbose
         self.orientation = orientation

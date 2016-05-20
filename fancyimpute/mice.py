@@ -186,6 +186,9 @@ class MICE(Solver):
                     # probability of column draw is proportional to absolute
                     # pearson correlation
                     p = abs_correlation_matrix[col_idx, :]
+                    # adding a small amount of weight to every bin to make sure
+                    # every column has some small chance of being chosen
+                    p += 0.0000001
                     # save this probability so that we can put it back
                     # after temporarily zeroing it out
                     current_column_prob = p[col_idx]

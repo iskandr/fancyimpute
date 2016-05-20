@@ -36,6 +36,7 @@ class SoftImpute(Solver):
             init_fill_method="zero",
             min_value=None,
             max_value=None,
+            normalizer=None,
             verbose=True):
         """
         Parameters
@@ -70,6 +71,9 @@ class SoftImpute(Solver):
         max_value : float
             Largest allowable value in the solution
 
+        normalizer : object
+            Any object (such as BiScaler) with fit() and transform() methods
+
         verbose : bool
             Print debugging info
         """
@@ -77,7 +81,8 @@ class SoftImpute(Solver):
             self,
             fill_method=init_fill_method,
             min_value=min_value,
-            max_value=max_value)
+            max_value=max_value,
+            normalizer=normalizer)
         self.shrinkage_value = shrinkage_value
         self.convergence_threshold = convergence_threshold
         self.max_iters = max_iters
