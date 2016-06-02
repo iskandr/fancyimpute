@@ -35,7 +35,7 @@ except:
 if __name__ == '__main__':
     setup(
         name='fancyimpute',
-        version="0.0.16",
+        version="0.0.18",
         description="Matrix completion and feature imputation algorithms",
         author="Alex Rubinsteyn, Sergey Feldman",
         author_email="alex {dot} rubinsteyn {at} gmail {dot} com",
@@ -52,6 +52,7 @@ if __name__ == '__main__':
         ],
         install_requires=[
             'six',
+            'knnimpute',
             # need at least 1.10 for np.multi_dot
             'numpy>=1.10',
             'scipy',

@@ -3,3 +3,4 @@ keras
 downhill
 climate
 cvxpy
+knnimpute

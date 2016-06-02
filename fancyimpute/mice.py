@@ -185,16 +185,16 @@ class MICE(Solver):
                 else:
                     # probability of column draw is proportional to absolute
                     # pearson correlation
-                    p = abs_correlation_matrix[col_idx, :]
+                    p = abs_correlation_matrix[col_idx, :].copy()
+
                     # adding a small amount of weight to every bin to make sure
                     # every column has some small chance of being chosen
                     p += 0.0000001
-                    # save this probability so that we can put it back
-                    # after temporarily zeroing it out
-                    current_column_prob = p[col_idx]
+
                     # make the probability of choosing the current column
                     # zero
                     p[col_idx] = 0
+
                     if self.add_ones:
                         p = p[:-1] / p[:-1].sum()
                         other_column_indices = np.random.choice(
@@ -212,9 +212,6 @@ class MICE(Solver):
                             self.n_nearest_columns,
                             replace=False,
                             p=p)
-                    # restore the probability value that we momentarily
-                    # set to zero
-                    p[col_idx] = current_column_prob
 
                 X_other_cols = X_filled[:, other_column_indices]
                 X_other_cols_observed = X_other_cols[observed_row_mask_for_this_col]
