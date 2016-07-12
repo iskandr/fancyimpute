@@ -14,7 +14,7 @@ from __future__ import absolute_import, print_function, division
 
 from six.moves import range
 import numpy as np
-from sklearn.decomposition import randomized_svd
+from sklearn.utils.extmath import randomized_svd
 
 from .common import masked_mae
 from .solver import Solver
