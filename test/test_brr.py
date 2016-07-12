@@ -10,16 +10,15 @@ def test_brr_like_sklearn():
     X = np.random.randn(n, d)
     beta_true = np.random.random(d)
     y = np.dot(X, beta_true) + np.sqrt(sigma_sqr) * np.random.randn(n)
-    X_tr = X[:n / 2, :]
-    y_tr = y[:n / 2]
-    X_ts = X[n / 2:, :]
-    #  y_ts = y[n / 2:]
-
+    X_tr = X[:n // 2, :]
+    y_tr = y[:n // 2]
+    X_ts = X[n // 2:, :]
     # prediction with my own bayesian ridge
     lambda_reg = 1
-    brr = BayesianRidgeRegression(lambda_reg,
-                                  add_ones=True,
-                                  normalize_lambda=False)
+    brr = BayesianRidgeRegression(
+        lambda_reg,
+        add_ones=True,
+        normalize_lambda=False)
     brr.fit(X_tr, y_tr)
     y_ts_brr = brr.predict(X_ts)
 
