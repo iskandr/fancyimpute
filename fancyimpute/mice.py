@@ -40,7 +40,7 @@ class MICE(Solver):
             Defaults to 10
 
         impute_type : str
-            "ppm" is probablistic moment matching.
+            "pmm" is probablistic moment matching.
             "col" (default) means fill in with samples from posterior predictive
                 distribution.
 
