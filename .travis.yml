@@ -36,6 +36,7 @@ install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
       numpy=1.10 scipy nose pandas matplotlib cvxopt theano scikit-learn
+  - conda install -c conda-forge tensorflow
   - source activate test-environment
    # install SCS solver for cvxpy
   - conda install -c https://conda.anaconda.org/omnia scs
@@ -43,12 +44,6 @@ install:
   - pip install -r requirements.txt
   # install the latest Theano
   - pip install git+git://github.com/Theano/Theano.git --upgrade --no-deps
-  # install TensorFlow
-  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-      pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.11.0-cp27-none-linux_x86_64.whl;
-    elif [[ "$TRAVIS_PYTHON_VERSION" == "3.4" ]]; then
-      pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.11.0-cp34-cp34m-linux_x86_64.whl;
-    fi
   - pip install .
   - pip install coveralls
   - export PACKAGE_DIR=`pwd`
