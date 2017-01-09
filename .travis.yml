@@ -40,8 +40,6 @@ install:
       numpy=1.10 scipy nose pandas matplotlib cvxopt theano scikit-learn
   - conda install -c conda-forge tensorflow
   - source activate test-environment
-   # Try installing SCS two different ways
-  - conda install -c https://conda.anaconda.org/omnia scs
   - conda install -c cvxgrp scs=1.2.6
   - pip install pypandoc
   - pip install -r requirements.txt
