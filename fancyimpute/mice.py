@@ -54,9 +54,6 @@ class MICE(Solver):
             is by default scaled by np.linalg.norm(np.dot(X.T,X)).
             Sensible lambda_regs to try: 0.25, 0.1, 0.01, 0.001, 0.0001.
 
-        add_ones : boolean
-            Whether to add a constant column of ones. Defaults to True.
-
         n_nearest_columns : int
             Number of other columns to use to estimate current column.
             Useful when number of columns is huge.
@@ -83,8 +80,7 @@ class MICE(Solver):
             n_burn_in=10,  # this many replicates will be thrown away
             n_pmm_neighbors=5,  # number of nearest neighbors in PMM
             impute_type='col',  # also can be pmm
-            model=BayesianRidgeRegression(lambda_reg=0.001),
-            add_ones=True,
+            model=BayesianRidgeRegression(lambda_reg=0.001, add_ones=True),
             n_nearest_columns=np.infty,
             init_fill_method="mean",
             min_value=None,
@@ -118,9 +114,6 @@ class MICE(Solver):
             is by default scaled by np.linalg.norm(np.dot(X.T,X)).
             Sensible lambda_regs to try: 0.1, 0.01, 0.001, 0.0001.
 
-        add_ones : boolean
-            Whether to add a constant column of ones. Defaults to True.
-
         n_nearest_columns : int
             Number of other columns to use to estimate current column.
             Useful when number of columns is huge.
@@ -144,7 +137,6 @@ class MICE(Solver):
         self.n_pmm_neighbors = n_pmm_neighbors
         self.impute_type = impute_type
         self.model = model
-        self.add_ones = add_ones
         self.n_nearest_columns = n_nearest_columns
         self.verbose = verbose
 
@@ -159,11 +151,11 @@ class MICE(Solver):
         """
         n_rows, n_cols = X_filled.shape
 
-        # number of columns excluding the optional constant column
-        n_original_cols = n_cols - int(self.add_ones)
-
-        if n_original_cols > self.n_nearest_columns:
-            abs_correlation_matrix = np.abs(np.corrcoef(X_filled.T))
+        if n_cols > self.n_nearest_columns:
+            # make a correlation matrix between all the original columns,
+            # excluding the constant ones
+            correlation_matrix = np.corrcoef(X_filled, rowvar=0)
+            abs_correlation_matrix = np.abs(correlation_matrix)
 
         n_missing_for_each_column = missing_mask.sum(axis=0)
         ordered_column_indices = np.arange(n_cols)
@@ -177,7 +169,7 @@ class MICE(Solver):
                 column_values = X_filled[:, col_idx]
                 column_values_observed = column_values[observed_row_mask_for_this_col]
 
-                if n_original_cols <= self.n_nearest_columns:
+                if n_cols <= self.n_nearest_columns:
                     other_column_indices = np.concatenate([
                         ordered_column_indices[:col_idx],
                         ordered_column_indices[col_idx + 1:]
@@ -195,24 +187,12 @@ class MICE(Solver):
                     # zero
                     p[col_idx] = 0
 
-                    if self.add_ones:
-                        p = p[:-1] / p[:-1].sum()
-                        other_column_indices = np.random.choice(
-                            ordered_column_indices[:-1],
-                            self.n_nearest_columns,
-                            replace=False,
-                            p=p)
-                        other_column_indices = np.append(
-                            other_column_indices,
-                            n_original_cols)
-                    else:
-                        p /= p.sum()
-                        other_column_indices = np.random.choice(
-                            ordered_column_indices,
-                            self.n_nearest_columns,
-                            replace=False,
-                            p=p)
-
+                    p /= p.sum()
+                    other_column_indices = np.random.choice(
+                        ordered_column_indices,
+                        self.n_nearest_columns,
+                        replace=False,
+                        p=p)
                 X_other_cols = X_filled[:, other_column_indices]
                 X_other_cols_observed = X_other_cols[observed_row_mask_for_this_col]
                 brr = self.model
@@ -316,15 +296,6 @@ class MICE(Solver):
         self._check_missing_value_mask(missing_mask)
 
         visit_indices = self.get_visit_indices(missing_mask)
-
-        n_rows = len(X)
-        if self.add_ones:
-            X = np.column_stack((X, np.ones(n_rows)))
-            missing_mask = np.column_stack([
-                missing_mask,
-                np.zeros(n_rows, dtype=missing_mask.dtype)
-            ])
-
         # since we're accessing the missing mask one column at a time,
         # lay it out so that columns are contiguous
         missing_mask = np.asarray(missing_mask, order="F")
@@ -354,9 +325,6 @@ class MICE(Solver):
                 visit_indices=visit_indices)
             if m >= self.n_burn_in:
                 results_list.append(X_filled[missing_mask])
-        if self.add_ones:
-            # chop off the missing mask corresponding to the constant ones
-            missing_mask = missing_mask[:, :-1]
         return np.array(results_list), missing_mask
 
     def complete(self, X):

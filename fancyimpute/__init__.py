@@ -12,3 +12,18 @@ from .soft_impute import SoftImpute
 from .biscaler import BiScaler
 from .knn import KNN
 from .similarity_weighted_averaging import SimilarityWeightedAveraging
+
+__all__ = [
+    "Solver",
+    "NuclearNormMinimization",
+    "BayesianRidgeRegression",
+    "MICE",
+    "AutoEncoder",
+    "MatrixFactorization",
+    "IterativeSVD",
+    "SimpleFill",
+    "SoftImpute",
+    "BiScaler",
+    "KNN",
+    "SimilarityWeightedAveraging"
+]
