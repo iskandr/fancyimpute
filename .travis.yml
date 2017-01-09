@@ -1,11 +1,13 @@
 sudo: false  # Use container-based infrastructure
 language: python
-python:
-  - "2.7"
-  - "3.4"
-  # Wish I could use Python 3.5 but cvxpy fails to install due to the
-  # multiprocess package. No idea why!
-  # - "3.5"
+matrix:
+  include:
+    # Wish I could use Python 3.5 but cvxpy fails to install due to the
+    # multiprocess package. No idea why!
+    - python: 2.7
+      env: KERAS_BACKEND=theano
+    - python: 3.4
+      env: KERAS_BACKEND=theano
 before_install:
   # Commands below copied from: http://conda.pydata.org/docs/travis.html
   # We do this conditionally because it saves us some downloading if the
