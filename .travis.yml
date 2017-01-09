@@ -42,7 +42,7 @@ install:
   - source activate test-environment
    # Try installing SCS two different ways
   - conda install -c https://conda.anaconda.org/omnia scs
-  - conda install -c ramcha24 scs=1.2.2
+  - conda install -c cvxgrp scs=1.2.6
   - pip install pypandoc
   - pip install -r requirements.txt
   # install the latest Theano
