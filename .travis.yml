@@ -15,7 +15,7 @@ before_install:
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
       wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
     else
-      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+      wget https://repo.continuum.ißo/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
     fi
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
@@ -40,8 +40,9 @@ install:
       numpy=1.10 scipy nose pandas matplotlib cvxopt theano scikit-learn
   - conda install -c conda-forge tensorflow
   - source activate test-environment
-   # install SCS solver for cvxpy
+   # Try installing SCS two different ways
   - conda install -c https://conda.anaconda.org/omnia scs
+  - conda install -c ramcha24 scs=1.2.2
   - pip install pypandoc
   - pip install -r requirements.txt
   # install the latest Theano
@@ -49,12 +50,6 @@ install:
   - pip install .
   - pip install coveralls
   - export PACKAGE_DIR=`pwd`
-  # try installing SCS from github
-  - git clone https://github.com/cvxgrp/scs.git
-  - cd scs
-  - make
-  - cd python
-  - python setup.py install
 script:
   - cd $PACKAGE_DIR
   - nosetests test --with-coverage --cover-package=fancyimpute
