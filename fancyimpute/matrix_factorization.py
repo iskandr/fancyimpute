@@ -62,9 +62,6 @@ class MatrixFactorization(Solver):
         self.min_improvement = min_improvement
         self.verbose = verbose
 
-        if self.verbose:
-            climate.enable_default_logging()
-
     def solve(self, X, missing_mask):
         (n_samples, n_features) = X.shape
         observed_mask = 1 - missing_mask
