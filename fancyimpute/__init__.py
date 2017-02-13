@@ -4,7 +4,6 @@ from .solver import Solver
 from .nuclear_norm_minimization import NuclearNormMinimization
 from .bayesian_ridge_regression import BayesianRidgeRegression
 from .mice import MICE
-from .auto_encoder import AutoEncoder
 from .matrix_factorization import MatrixFactorization
 from .iterative_svd import IterativeSVD
 from .simple_fill import SimpleFill
@@ -18,7 +17,6 @@ __all__ = [
     "NuclearNormMinimization",
     "BayesianRidgeRegression",
     "MICE",
-    "AutoEncoder",
     "MatrixFactorization",
     "IterativeSVD",
     "SimpleFill",
