@@ -153,8 +153,8 @@ class SimilarityWeightedAveraging(object):
     def complete(self, X):
         if self.verbose:
             print(
-                "[SimilarityWeightedAveraging] Creating dictionary from matrix with shape %s" % (
-                    X.shape,))
+                ("[SimilarityWeightedAveraging] Creating dictionary from matrix "
+                 " with shape %s") % (X.shape,))
         missing_mask = np.isnan(X)
         observed_mask = ~missing_mask
         sparse_dict = matrix_to_nested_dictionary(
