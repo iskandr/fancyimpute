@@ -59,8 +59,6 @@ if __name__ == '__main__':
             # used by NuclearNormMinimization
             'cvxpy',
             'scikit-learn>=0.17.1',
-            # used by AutoEncoder
-            'keras',
             # used by MatrixFactorization
             'downhill',
             'climate',

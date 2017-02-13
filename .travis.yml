@@ -43,8 +43,6 @@ install:
   - conda install -c cvxgrp scs=1.2.6
   - pip install pypandoc
   - pip install -r requirements.txt
-  # install the latest Theano
-  - pip install git+git://github.com/Theano/Theano.git --upgrade --no-deps
   - pip install .
   - pip install coveralls
   - export PACKAGE_DIR=`pwd`
