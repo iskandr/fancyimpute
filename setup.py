@@ -38,7 +38,7 @@ if __name__ == '__main__':
         version="0.2.0",
         description="Matrix completion and feature imputation algorithms",
         author="Alex Rubinsteyn, Sergey Feldman",
-        author_email="alex {dot} rubinsteyn {at} gmail {dot} com",
+        author_email="alex.rubinsteyn@gmail.com",
         url="https://github.com/hammerlab/fancyimpute",
         license="http://www.apache.org/licenses/LICENSE-2.0.html",
         classifiers=[
