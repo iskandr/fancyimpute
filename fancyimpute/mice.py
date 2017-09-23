@@ -330,7 +330,7 @@ class MICE(Solver):
     def complete(self, X):
         if self.verbose:
             print("[MICE] Completing matrix with shape %s" % (X.shape,))
-        X_completed = X.copy()
+        X_completed = np.array(X.copy())
         imputed_arrays, missing_mask = self.multiple_imputations(X)
         # average the imputed values for each feature
         average_imputated_values = imputed_arrays.mean(axis=0)
