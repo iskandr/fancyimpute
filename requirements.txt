@@ -4,3 +4,4 @@ climate
 cvxpy
 knnimpute
 scikit-learn>=0.17.1
+numpy
