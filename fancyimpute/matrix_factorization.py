@@ -12,12 +12,16 @@
 
 from __future__ import absolute_import, print_function, division
 
-import climate
-import downhill
 import numpy as np
-import theano
-import theano.tensor as T
+from keras import regularizers
+from keras.callbacks import EarlyStopping
+from keras.layers import Input
+from keras.models import Model
+from sklearn.utils import shuffle
 
+from .common import import_from
+from .scaler import Scaler
+from .keras_models import KerasMatrixFactorizer
 from .solver import Solver
 
 
@@ -32,69 +36,82 @@ class MatrixFactorization(Solver):
 
     Adapted from the example on http://downhill.readthedocs.org/en/stable/
     """
+
     def __init__(
             self,
             rank=10,
-            initializer=np.random.randn,
             learning_rate=0.001,
             patience=5,
-            l1_penalty=0.05,
-            l2_penalty=0.05,
-            min_improvement=0.005,
-            max_gradient_norm=5,
-            optimization_algorithm="adam",
+            l2_penalty=1e-5,
+            min_improvement=0.001,
+            optimization_algorithm="nadam",
+            loss='mse',
+            validation_frac=0.1,
             min_value=None,
             max_value=None,
+            normalizer=Scaler(),
             verbose=True):
         Solver.__init__(
             self,
-            fill_method="zero",
             min_value=min_value,
-            max_value=max_value)
+            max_value=max_value,
+            normalizer=normalizer)
         self.rank = rank
-        self.initializer = initializer
         self.learning_rate = learning_rate
         self.patience = patience
-        self.l1_penalty = l1_penalty
         self.l2_penalty = l2_penalty
-        self.max_gradient_norm = max_gradient_norm
         self.optimization_algorithm = optimization_algorithm
+        self.loss = loss
+        self.validation_frac = 0.1
         self.min_improvement = min_improvement
+        self.normalizer = normalizer
         self.verbose = verbose
 
     def solve(self, X, missing_mask):
+        # shape data to fit into keras model
         (n_samples, n_features) = X.shape
-        observed_mask = 1 - missing_mask
+        observed_mask = ~missing_mask
+        missing_mask_flat = missing_mask.flatten()
+        observed_mask_flat = observed_mask.flatten()
 
-        # Set up a matrix factorization problem to optimize.
-        U_init = self.initializer(n_samples, self.rank).astype(X.dtype)
-        V_init = self.initializer(self.rank, n_features).astype(X.dtype)
-        U = theano.shared(U_init, name="U")
-        V = theano.shared(V_init, name="V")
-        X_symbolic = T.matrix(name="X", dtype=X.dtype)
-        reconstruction = T.dot(U, V)
+        columns, rows = np.meshgrid(np.arange(n_features), np.arange(n_samples))
 
-        difference = X_symbolic - reconstruction
+        # training data
+        i_tr = rows.flatten()[observed_mask_flat]
+        j_tr = columns.flatten()[observed_mask_flat]
+        ij_tr = np.vstack([i_tr, j_tr]).T  # input to factorizer
+        y_tr = X.flatten()[observed_mask_flat]  # output of factorizer
+        ij_tr, y_tr = shuffle(ij_tr, y_tr)
 
-        masked_difference = difference * observed_mask
-        err = T.sqr(masked_difference)
-        mse = err.mean()
-        loss = (
-            mse +
-            self.l1_penalty * abs(U).mean() +
-            self.l2_penalty * (V * V).mean())
-        downhill.minimize(
-            loss=loss,
-            train=[X],
-            patience=self.patience,
-            algo=self.optimization_algorithm,
-            batch_size=n_samples,
-            min_improvement=self.min_improvement,
-            max_gradient_norm=self.max_gradient_norm,
-            learning_rate=self.learning_rate,
-            monitors=[("error", err.mean())],
-            monitor_gradients=self.verbose)
+        # make a keras model
+        main_input = Input(shape=(2,), dtype='int32')
+        embed = KerasMatrixFactorizer(
+            rank=self.rank,
+            input_dim_i=n_samples,
+            input_dim_j=n_features,
+            embeddings_regularizer=regularizers.l2(self.l2_penalty)
+        )(main_input)
+        model = Model(inputs=main_input, outputs=embed)
+        optimizer = import_from(
+            'keras.optimizers', self.optimization_algorithm
+        )(lr=self.learning_rate)
+        model.compile(optimizer=optimizer, loss=self.loss)
+        callbacks = [EarlyStopping(patience=self.patience, min_delta=self.min_improvement)]
+        model.fit(
+            ij_tr,
+            y_tr,
+            batch_size=int(len(y_tr * (1 - self.validation_frac))),
+            epochs=10000,
+            validation_split=self.validation_frac,
+            callbacks=callbacks,
+            shuffle=True,
+            verbose=2
+        )
 
-        U_value = U.get_value()
-        V_value = V.get_value()
-        return np.dot(U_value, V_value)
+        # reassemble the original X
+        i_ts = rows.flatten()[missing_mask_flat]
+        j_ts = columns.flatten()[missing_mask_flat]
+        ij_ts = np.vstack([i_ts, j_ts]).T  # input to factorizer
+        X[i_ts, j_ts] = model.predict(ij_ts).T[0]
+
+        return X

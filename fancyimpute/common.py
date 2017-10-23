@@ -12,10 +12,21 @@
 
 from __future__ import absolute_import, print_function, division
 import logging
+import importlib
 
 import numpy as np
 from six.moves import range
 
+
+def import_from(module, name):
+    '''
+    usage example:
+    grid = import_from('sklearn.model_selection', 'GridSearchCV')
+    is equivalent to:
+    from sklearn.model_selection import GridSearchV as grid
+    '''
+    module = importlib.import_module(module)
+    return getattr(module, name)
 
 def masked_mae(X_true, X_pred, mask):
     masked_diff = X_true[mask] - X_pred[mask]

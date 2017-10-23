@@ -129,16 +129,6 @@ class Solver(object):
         self._check_missing_value_mask(missing_mask)
         return X, missing_mask
 
-    def normalize_input_columns(self, X, inplace=False):
-        if not inplace:
-            X = X.copy()
-        column_centers = np.nanmean(X, axis=0)
-        column_scales = np.nanstd(X, axis=0)
-        column_scales[column_scales == 0] = 1.0
-        X -= column_centers
-        X /= column_scales
-        return X, column_centers, column_scales
-
     def clip(self, X):
         """
         Clip values to fall within any global or column-wise min/max constraints
