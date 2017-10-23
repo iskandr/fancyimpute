@@ -37,7 +37,7 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy=1.10 scipy nose pandas matplotlib cvxopt tensorflow keras scikit-learn
+      numpy=1.10 scipy nose pandas matplotlib cvxopt tensorflow scikit-learn
   - conda install -c conda-forge tensorflow
   - source activate test-environment
   - conda install -c cvxgrp scs=1.2.6
