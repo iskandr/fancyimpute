@@ -1,6 +1,5 @@
 six
-downhill
-climate
+keras>=2.0.0
 cvxpy
 knnimpute
 scikit-learn>=0.17.1

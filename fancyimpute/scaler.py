@@ -16,6 +16,57 @@ from six.moves import range
 
 import numpy as np
 
+class Scaler(object):
+    """
+    Iterative estimation of row and column centering/scaling
+    using the algorithm from page 31 of:
+        Matrix Completion and Low-Rank SVD via Fast Alternating Least Squares
+    """
+
+    def __init__(
+            self,
+            center_columns=True,
+            scale_columns=True,
+            min_value=None,
+            max_value=None,
+            verbose=True):
+        self.center_columns = center_columns
+        self.scale_columns = scale_columns
+        self.min_value = min_value
+        self.max_value = max_value
+        self.verbose = verbose
+
+        self.column_centers = None
+        self.column_scales = None
+
+    def fit(self, X):
+        if self.center_columns:
+            self.column_centers = np.nanmean(X, axis=0)
+        if self.scale_columns:
+            self.column_scales = np.nanstd(X, axis=0)
+            self.column_scales[self.column_scales == 0] = 1.0
+        return self
+
+    def transform(self, X):
+        X = np.asarray(X).copy()
+        if self.center_columns:
+            X -= self.column_centers
+        if self.scale_columns:
+            X /= self.column_scales
+        return X
+
+    def fit_transform(self, X):
+        self.fit(X)
+        return self.transform(X)
+
+    def inverse_transform(self, X):
+        X = np.asarray(X).copy()
+        if self.scale_columns:
+            X *= self.column_scales
+        if self.center_columns:
+            X += self.column_centers
+        return X
+
 
 class BiScaler(object):
     """

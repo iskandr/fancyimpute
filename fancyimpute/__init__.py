@@ -8,7 +8,7 @@ from .matrix_factorization import MatrixFactorization
 from .iterative_svd import IterativeSVD
 from .simple_fill import SimpleFill
 from .soft_impute import SoftImpute
-from .biscaler import BiScaler
+from .scaler import BiScaler
 from .knn import KNN
 from .similarity_weighted_averaging import SimilarityWeightedAveraging
 

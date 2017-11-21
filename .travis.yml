@@ -5,9 +5,9 @@ matrix:
     # Wish I could use Python 3.5 but cvxpy fails to install due to the
     # multiprocess package. No idea why!
     - python: 2.7
-      env: KERAS_BACKEND=theano
+      env: KERAS_BACKEND=tensorflow
     - python: 3.5
-      env: KERAS_BACKEND=theano
+      env: KERAS_BACKEND=tensorflow
 before_install:
   # Commands below copied from: http://conda.pydata.org/docs/travis.html
   # We do this conditionally because it saves us some downloading if the
@@ -37,7 +37,7 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy=1.10 scipy nose pandas matplotlib cvxopt theano scikit-learn
+      numpy=1.13 scipy nose pandas matplotlib cvxopt tensorflow scikit-learn
   - conda install -c conda-forge tensorflow
   - source activate test-environment
   - conda install -c cvxgrp scs=1.2.6
