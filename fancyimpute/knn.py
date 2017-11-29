@@ -39,7 +39,8 @@ class KNN(Solver):
             min_value=None,
             max_value=None,
             normalizer=None,
-            verbose=True):
+            verbose=True,
+            warnings=True):
         """
         Parameters
         ----------
@@ -102,9 +103,10 @@ class KNN(Solver):
         failed_to_impute = np.isnan(X_imputed)
         n_missing_after_imputation = failed_to_impute.sum()
         if n_missing_after_imputation != 0:
-            print("[KNN] Warning: %d/%d still missing after imputation, replacing with 0" % (
-                n_missing_after_imputation,
-                X.shape[0] * X.shape[1]))
+            if warnings:
+                print("[KNN] Warning: %d/%d still missing after imputation, replacing with 0" % (
+                    n_missing_after_imputation,
+                    X.shape[0] * X.shape[1]))
             X_imputed[failed_to_impute] = X[failed_to_impute]
 
         if self.orientation == "columns":
