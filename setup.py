@@ -63,6 +63,8 @@ if __name__ == '__main__':
             'downhill',
             'climate',
             'theano',
+            'keras>=2.0.0',
+            'tensorflow',
         ],
         long_description=readme,
         packages=['fancyimpute'],
