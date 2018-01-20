@@ -60,9 +60,6 @@ if __name__ == '__main__':
             'cvxpy',
             'scikit-learn>=0.17.1',
             # used by MatrixFactorization
-            'downhill',
-            'climate',
-            'theano',
             'keras>=2.0.0',
             'tensorflow',
         ],
