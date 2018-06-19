@@ -51,7 +51,7 @@ on features for which two rows both have observed data.
 * `MatrixFactorization`: Direct factorization of the incomplete matrix into low-rank `U` and `V`, with an L1 sparsity penalty on the elements of `U` and an L2 penalty on the elements of `V`. Solved by gradient descent.
 
 * `NuclearNormMinimization`: Simple implementation of [Exact Matrix Completion via Convex Optimization](http://statweb.stanford.edu/~candes/papers/MatrixCompletion.pdf
-) by Emmanuel Candes and Benjamin Recht using [cvxpy](http://www.cvxpy.org/en/latest/). Too slow for large matrices.
+) by Emmanuel Candes and Benjamin Recht using [cvxpy](http://www.cvxpy.org). Too slow for large matrices.
 
 * `BiScaler`: Iterative estimation of row/column means and standard deviations to get doubly normalized
 matrix. Not guaranteed to converge but works well in practice. Taken from [Matrix Completion and Low-Rank SVD via Fast Alternating Least Squares](http://arxiv.org/abs/1410.2596).
