@@ -61,6 +61,7 @@ if __name__ == '__main__':
             'scikit-learn>=0.17.1',
             # used by MatrixFactorization
             'keras>=2.0.0',
+            'np_utils',
             'tensorflow',
         ],
         long_description=readme,

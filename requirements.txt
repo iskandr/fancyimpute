@@ -1,5 +1,6 @@
 six
 keras>=2.0.0
+np_utils
 cvxpy
 knnimpute
 scikit-learn>=0.17.1
