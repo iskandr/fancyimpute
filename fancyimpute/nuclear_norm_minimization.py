@@ -102,7 +102,8 @@ class NuclearNormMinimization(Solver):
         solution to the convex optimization problem.
         """
         # S is the completed matrix
-        S = cvxpy.Variable(m, n, name="S")
+        shape = (m, n)
+        S = cvxpy.Variable(shape, name="S")
         norm = cvxpy.norm(S, "nuc")
         objective = cvxpy.Minimize(norm)
         return S, objective
