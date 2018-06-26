@@ -24,10 +24,10 @@ class KNN(Solver):
 
     Assumes that each feature has been centered and rescaled to have
     mean 0 and variance 1.
-    
+
     Inspired by the implementation of kNNImpute from the R package
     imputation.
-    See here: 
+    See here:
     https://www.rdocumentation.org/packages/imputation/versions/2.0.3/topics/kNNImpute
     """
     def __init__(

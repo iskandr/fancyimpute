@@ -6,7 +6,7 @@ matrix:
     # multiprocess package. No idea why!
     - python: 2.7
       env: KERAS_BACKEND=tensorflow
-    - python: 3.5
+    - python: 3.6
       env: KERAS_BACKEND=tensorflow
 before_install:
   # Commands below copied from: http://conda.pydata.org/docs/travis.html
@@ -37,7 +37,7 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy=1.13 scipy nose pandas matplotlib cvxopt tensorflow scikit-learn
+      numpy keras scipy nose pandas matplotlib cvxopt tensorflow scikit-learn
   - conda install -c conda-forge tensorflow
   - source activate test-environment
   - conda install -c cvxgrp scs=1.2.6
