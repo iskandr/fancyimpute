@@ -76,8 +76,8 @@ class NuclearNormMinimization(Solver):
             Representation of solution variable
         """
         ok_mask = ~missing_mask
-        masked_X = cvxpy.mul_elemwise(ok_mask, X)
-        masked_S = cvxpy.mul_elemwise(ok_mask, S)
+        masked_X = cvxpy.multiply(ok_mask, X)
+        masked_S = cvxpy.multiply(ok_mask, S)
         abs_diff = cvxpy.abs(masked_S - masked_X)
         close_to_data = abs_diff <= error_tolerance
         constraints = [close_to_data]
