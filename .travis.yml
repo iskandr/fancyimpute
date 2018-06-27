@@ -1,13 +1,13 @@
 sudo: false  # Use container-based infrastructure
 language: python
+env:
+  global:
+    - KERAS_BACKEND=tensorflow
+    - CUDA_VISIBLE_DEVICES=""
 matrix:
   include:
-    # Wish I could use Python 3.5 but cvxpy fails to install due to the
-    # multiprocess package. No idea why!
     - python: 2.7
-      env: KERAS_BACKEND=tensorflow
     - python: 3.6
-      env: KERAS_BACKEND=tensorflow
 before_install:
   # Commands below copied from: http://conda.pydata.org/docs/travis.html
   # We do this conditionally because it saves us some downloading if the
