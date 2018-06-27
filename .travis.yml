@@ -37,10 +37,11 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy keras scipy nose pandas matplotlib cvxopt tensorflow scikit-learn
-  - conda install -c conda-forge tensorflow
+      numpy keras scipy nose pandas matplotlib cvxopt scikit-learn
   - source activate test-environment
   - conda install -c cvxgrp scs=1.2.6
+  # install TensorFlow for CPU only
+  - pip install --ignore-installed --upgrade https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-1.8.0-cp34-cp34m-linux_x86_64.whl
   - pip install pypandoc
   - pip install -r requirements.txt
   - pip install .
