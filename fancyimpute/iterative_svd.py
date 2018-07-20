@@ -13,6 +13,7 @@
 from __future__ import absolute_import, print_function, division
 
 from sklearn.decomposition import TruncatedSVD
+from sklearn.utils import check_array
 import numpy as np
 
 from .solver import Solver
@@ -53,6 +54,8 @@ class IterativeSVD(Solver):
         return (ssd / old_norm_squared) < self.convergence_threshold
 
     def solve(self, X, missing_mask):
+        X = check_array(X, force_all_finite=False)
+
         observed_mask = ~missing_mask
         X_filled = X
         for i in range(self.max_iters):

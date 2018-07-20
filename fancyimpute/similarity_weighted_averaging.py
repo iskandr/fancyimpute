@@ -13,6 +13,8 @@
 from __future__ import absolute_import, print_function, division
 from collections import defaultdict
 
+from sklearn.utils import check_array
+
 import numpy as np
 
 from .dictionary_helpers import (
@@ -151,6 +153,8 @@ class SimilarityWeightedAveraging(object):
         return result
 
     def complete(self, X):
+        X = check_array(X, force_all_finite=False)
+
         if self.verbose:
             print(
                 ("[SimilarityWeightedAveraging] Creating dictionary from matrix "

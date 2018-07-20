@@ -17,7 +17,7 @@ from keras import regularizers
 from keras.callbacks import EarlyStopping
 from keras.layers import Input
 from keras.models import Model
-from sklearn.utils import shuffle
+from sklearn.utils import shuffle, check_array
 
 from .common import import_from
 from .scaler import Scaler
@@ -68,6 +68,8 @@ class MatrixFactorization(Solver):
         self.verbose = verbose
 
     def solve(self, X, missing_mask):
+        X = check_array(X, force_all_finite=False)
+
         # shape data to fit into keras model
         (n_samples, n_features) = X.shape
         observed_mask = ~missing_mask

@@ -17,6 +17,8 @@ from numpy import dot, append, column_stack, ones
 from numpy.linalg import norm, inv, multi_dot
 from numpy.random import multivariate_normal
 
+from sklearn.utils import check_array
+
 
 class BayesianRidgeRegression(object):
     """
@@ -44,6 +46,8 @@ class BayesianRidgeRegression(object):
         self.normalize_lambda = normalize_lambda
 
     def fit(self, X, y, inverse_covariance=None):
+        X = check_array(X)
+
         if self.add_ones:
             X_ones = self.add_column_of_ones(X)
         else:

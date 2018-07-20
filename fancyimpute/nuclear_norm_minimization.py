@@ -16,6 +16,7 @@ import cvxpy
 
 from .solver import Solver
 
+from sklearn.utils import check_array
 
 class NuclearNormMinimization(Solver):
     """
@@ -109,6 +110,8 @@ class NuclearNormMinimization(Solver):
         return S, objective
 
     def solve(self, X, missing_mask):
+        X = check_array(X, force_all_finite=False)
+
         m, n = X.shape
         S, objective = self._create_objective(m, n)
         constraints = self._constraints(

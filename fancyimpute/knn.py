@@ -14,6 +14,7 @@ from __future__ import absolute_import, print_function, division
 import numpy as np
 
 from knnimpute import knn_impute_few_observed, knn_impute_with_argpartition
+from sklearn.utils import check_array
 
 from .solver import Solver
 
@@ -83,6 +84,8 @@ class KNN(Solver):
             self._impute_fn = knn_impute_few_observed
 
     def solve(self, X, missing_mask):
+        X = check_array(X, force_all_finite=False)
+
         if self.orientation == "columns":
             X = X.T
             missing_mask = missing_mask.T
