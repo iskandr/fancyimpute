@@ -66,6 +66,8 @@ class Solver(object):
                 continue
             col_data = X[:, col_idx]
             fill_values = col_fn(col_data)
+            if np.isnan(fill_values):
+                fill_values = 0
             X[missing_col, col_idx] = fill_values
 
     def fill(
