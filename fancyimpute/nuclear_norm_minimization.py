@@ -29,7 +29,7 @@ class NuclearNormMinimization(Solver):
             min_value=None,
             max_value=None,
             error_tolerance=0.0001,
-            fast_but_approximate=True,
+            max_iters=50000,
             verbose=True):
         """
         Parameters
@@ -47,8 +47,8 @@ class NuclearNormMinimization(Solver):
             Degree of error allowed on reconstructed values. If omitted then
             defaults to 0.0001
 
-        fast_but_approximate : bool
-            Use the faster but less accurate Splitting Cone Solver
+        max_iters : int
+            Maximum number of iterations for the convex solver
 
         verbose : bool
             Print debug info
@@ -59,7 +59,7 @@ class NuclearNormMinimization(Solver):
             max_value=max_value)
         self.require_symmetric_solution = require_symmetric_solution
         self.error_tolerance = error_tolerance
-        self.fast_but_approximate = fast_but_approximate
+        self.max_iters = max_iters
         self.verbose = verbose
 
     def _constraints(self, X, missing_mask, S, error_tolerance):
@@ -119,6 +119,8 @@ class NuclearNormMinimization(Solver):
         problem = cvxpy.Problem(objective, constraints)
         problem.solve(
             verbose=self.verbose,
-            # SCS solver is known to be faster but less exact
-            solver=cvxpy.SCS if self.fast_but_approximate else None)
+            solver=cvxpy.SCS,
+            max_iters=self.max_iters,
+            # use_indirect, see: https://github.com/cvxgrp/cvxpy/issues/547
+            use_indirect=False)
         return S.value
