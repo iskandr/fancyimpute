@@ -15,6 +15,7 @@ from __future__ import absolute_import, print_function, division
 from six.moves import range
 import numpy as np
 from sklearn.utils.extmath import randomized_svd
+from sklearn.utils import check_array
 
 from .common import masked_mae
 from .solver import Solver
@@ -134,6 +135,8 @@ class SoftImpute(Solver):
         return s[0]
 
     def solve(self, X, missing_mask):
+        X = check_array(X, force_all_finite=False)
+
         X_init = X.copy()
 
         X_filled = X

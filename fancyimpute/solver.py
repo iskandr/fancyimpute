@@ -15,6 +15,8 @@ from __future__ import absolute_import, print_function, division
 import numpy as np
 from six.moves import range
 
+from sklearn.utils import check_array
+
 from .common import generate_random_column_samples
 
 
@@ -64,6 +66,8 @@ class Solver(object):
                 continue
             col_data = X[:, col_idx]
             fill_values = col_fn(col_data)
+            if np.isnan(fill_values):
+                fill_values = 0
             X[missing_col, col_idx] = fill_values
 
     def fill(
@@ -91,6 +95,8 @@ class Solver(object):
         inplace : bool
             Modify matrix or fill a copy
         """
+        X = check_array(X, force_all_finite=False)
+
         if not inplace:
             X = X.copy()
 
@@ -120,7 +126,7 @@ class Solver(object):
         Check to make sure that the input matrix and its mask of missing
         values are valid. Returns X and missing mask.
         """
-        X = np.asarray(X)
+        X = check_array(X, force_all_finite=False)
         if X.dtype != "f" and X.dtype != "d":
             X = X.astype(float)
 
@@ -142,7 +148,7 @@ class Solver(object):
 
     def project_result(self, X):
         """
-        First undo normaliztion and then clip to the user-specified min/max
+        First undo normalization and then clip to the user-specified min/max
         range.
         """
         X = np.asarray(X)
