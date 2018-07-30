@@ -33,8 +33,6 @@ class MatrixFactorization(Solver):
     The U, V are found by minimizing the difference between U.dot.V and
     X at the observed entries along with a sparsity penalty for U and an
     L2 penalty for V.
-
-    Adapted from the example on http://downhill.readthedocs.org/en/stable/
     """
 
     def __init__(
@@ -43,6 +41,7 @@ class MatrixFactorization(Solver):
             learning_rate=0.001,
             patience=5,
             l2_penalty=1e-5,
+            use_bias=True,
             min_improvement=0.001,
             optimization_algorithm="nadam",
             loss='mse',
@@ -60,9 +59,10 @@ class MatrixFactorization(Solver):
         self.learning_rate = learning_rate
         self.patience = patience
         self.l2_penalty = l2_penalty
+        self.use_bias = use_bias
         self.optimization_algorithm = optimization_algorithm
         self.loss = loss
-        self.validation_frac = 0.1
+        self.validation_frac = validation_frac
         self.min_improvement = min_improvement
         self.normalizer = normalizer
         self.verbose = verbose
