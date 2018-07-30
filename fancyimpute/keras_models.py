@@ -25,12 +25,14 @@ class KerasMatrixFactorizer(Layer):
             input_dim_i,
             input_dim_j,
             embeddings_regularizer=None,
+            use_bias=True,
             **kwargs
     ):
         self.rank = rank
         self.input_dim_i = input_dim_i
         self.input_dim_j = input_dim_j
         self.embeddings_regularizer = regularizers.get(embeddings_regularizer)
+        self.use_bias = use_bias
         super(KerasMatrixFactorizer, self).__init__(**kwargs)
 
     def build(self, input_shape):
@@ -47,21 +49,22 @@ class KerasMatrixFactorizer(Layer):
             name='j_embedding',
             regularizer=self.embeddings_regularizer
         )
-        self.i_bias = self.add_weight(
-            shape=(self.input_dim_i, 1),
-            initializer='zeros',
-            name='i_bias'
-        )
-        self.j_bias = self.add_weight(
-            shape=(self.input_dim_j, 1),
-            initializer='zeros',
-            name='j_bias'
-        )
-        self.constant = self.add_weight(
-            shape=(1, 1),
-            initializer='zeros',
-            name='constant',
-        )
+        if self.use_bias:
+            self.i_bias = self.add_weight(
+                shape=(self.input_dim_i, 1),
+                initializer='zeros',
+                name='i_bias'
+            )
+            self.j_bias = self.add_weight(
+                shape=(self.input_dim_j, 1),
+                initializer='zeros',
+                name='j_bias'
+            )
+            self.constant = self.add_weight(
+                shape=(1, 1),
+                initializer='zeros',
+                name='constant',
+            )
 
         self.built = True
         super(KerasMatrixFactorizer, self).build(input_shape)
@@ -74,11 +77,12 @@ class KerasMatrixFactorizer(Layer):
         j = inputs[:, 1]
         i_embedding = K.gather(self.i_embedding, i)
         j_embedding = K.gather(self.j_embedding, j)
-        i_bias = K.gather(self.i_bias, i)
-        j_bias = K.gather(self.j_bias, j)
         # <i_embed, j_embed> + i_bias + j_bias + constant
         out = K.batch_dot(i_embedding, j_embedding, axes=[1, 1])
-        out += (i_bias + j_bias + self.constant)
+        if self.use_bias:
+            i_bias = K.gather(self.i_bias, i)
+            j_bias = K.gather(self.j_bias, j)
+            out += (i_bias + j_bias + self.constant)
         return out
 
     def compute_output_shape(self, input_shape):
