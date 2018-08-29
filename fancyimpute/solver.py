@@ -12,6 +12,8 @@
 
 from __future__ import absolute_import, print_function, division
 
+import warnings
+
 import numpy as np
 from six.moves import range
 
@@ -54,7 +56,8 @@ class Solver(object):
 
     def _check_missing_value_mask(self, missing):
         if not missing.any():
-            raise ValueError("Input matrix is not missing any values")
+            warnings.simplefilter("always")
+            warnings.warn("Input matrix is not missing any values")
         if missing.all():
             raise ValueError("Input matrix must have some non-missing values")
 
