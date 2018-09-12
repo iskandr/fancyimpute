@@ -19,6 +19,7 @@ import numpy as np
 from .solver import Solver
 from .common import masked_mae
 
+F32PREC = np.finfo(np.float32).eps
 
 class IterativeSVD(Solver):
     def __init__(
@@ -51,7 +52,12 @@ class IterativeSVD(Solver):
         difference = old_missing_values - new_missing_values
         ssd = np.sum(difference ** 2)
         old_norm_squared = (old_missing_values ** 2).sum()
-        return (ssd / old_norm_squared) < self.convergence_threshold
+        # edge cases
+        if old_norm_squared == 0 or \
+                (old_norm_squared < F32PREC and ssd > F32PREC):
+            return False
+        else:
+            return (ssd / old_norm_squared) < self.convergence_threshold
 
     def solve(self, X, missing_mask):
         X = check_array(X, force_all_finite=False)
