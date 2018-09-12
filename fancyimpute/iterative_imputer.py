@@ -1,7 +1,3 @@
-"""Transformers for missing value imputation"""
-# Authors: Sergey Feldman <sergeyfeldman@gmail.com>
-# License: BSD 3 clause
-
 from __future__ import division
 
 import warnings
