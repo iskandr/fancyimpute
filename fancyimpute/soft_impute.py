@@ -20,6 +20,7 @@ from sklearn.utils import check_array
 from .common import masked_mae
 from .solver import Solver
 
+F32PREC = np.finfo(np.float32).eps
 
 class SoftImpute(Solver):
     """
@@ -98,7 +99,11 @@ class SoftImpute(Solver):
         difference = old_missing_values - new_missing_values
         ssd = np.sum(difference ** 2)
         old_norm = np.sqrt((old_missing_values ** 2).sum())
-        return (np.sqrt(ssd) / old_norm) < self.convergence_threshold
+        # edge cases
+        if old_norm == 0 or (old_norm < F32PREC and np.sqrt(ssd) > F32PREC):
+            return False
+        else:
+            return (np.sqrt(ssd) / old_norm) < self.convergence_threshold
 
     def _svd_step(self, X, shrinkage_value, max_rank=None):
         """

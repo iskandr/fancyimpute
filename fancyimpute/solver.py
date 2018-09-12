@@ -26,12 +26,10 @@ class Solver(object):
     def __init__(
             self,
             fill_method="zero",
-            n_imputations=1,
             min_value=None,
             max_value=None,
             normalizer=None):
         self.fill_method = fill_method
-        self.n_imputations = n_imputations
         self.min_value = min_value
         self.max_value = max_value
         self.normalizer = normalizer
@@ -69,7 +67,7 @@ class Solver(object):
                 continue
             col_data = X[:, col_idx]
             fill_values = col_fn(col_data)
-            if np.isnan(fill_values):
+            if np.all(np.isnan(fill_values)):
                 fill_values = 0
             X[missing_col, col_idx] = fill_values
 
@@ -167,7 +165,7 @@ class Solver(object):
         raise ValueError("%s.solve not yet implemented!" % (
             self.__class__.__name__,))
 
-    def single_imputation(self, X):
+    def complete(self, X):
         X_original, missing_mask = self.prepare_input_data(X)
         observed_mask = ~missing_mask
         X = X_original.copy()
@@ -190,21 +188,3 @@ class Solver(object):
         X_result = self.project_result(X=X_result)
         X_result[observed_mask] = X_original[observed_mask]
         return X_result
-
-    def multiple_imputations(self, X):
-        """
-        Generate multiple imputations of the same incomplete matrix
-        """
-        return [self.single_imputation(X) for _ in range(self.n_imputations)]
-
-    def complete(self, X):
-        """
-        Expects 2d float matrix with NaN entries signifying missing values
-
-        Returns completed matrix without any NaNs.
-        """
-        imputations = self.multiple_imputations(X)
-        if len(imputations) == 1:
-            return imputations[0]
-        else:
-            return np.mean(imputations, axis=0)

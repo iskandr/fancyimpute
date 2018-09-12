@@ -107,7 +107,7 @@ class MatrixFactorization(Solver):
             validation_split=self.validation_frac,
             callbacks=callbacks,
             shuffle=True,
-            verbose=2
+            verbose=self.verbose
         )
 
         # reassemble the original X

@@ -8,10 +8,14 @@ A variety of matrix completion and imputation algorithms implemented in Python.
 ## Usage
 
 ```python
-from fancyimpute import BiScaler, KNN, NuclearNormMinimization, SoftImpute
+from fancyimpute import KNN, NuclearNormMinimization, SoftImpute, IterativeImputer, BiScaler
 
 # X is the complete data matrix
 # X_incomplete has the same values as X except a subset have been replace with NaN
+
+# Model each feature with missing values as a function of other features, and 
+# use that estimate for imputation.
+X_filled_ii = IterativeImputer().complete(X_incomplete)
 
 # Use 3 nearest rows which have a feature to fill in each row's missing features
 X_filled_knn = KNN(k=3).complete(X_incomplete)
@@ -22,9 +26,13 @@ X_filled_nnm = NuclearNormMinimization().complete(X_incomplete)
 
 # Instead of solving the nuclear norm objective directly, instead
 # induce sparsity using singular value thresholding
+X_incomplete_normalized = BiScaler().fit_transform(X_incomplete)
 X_filled_softimpute = SoftImpute().complete(X_incomplete_normalized)
 
 # print mean squared error for the three imputation methods above
+ii_mse = ((X_filled_ii[missing_mask] - X[missing_mask]) ** 2).mean()
+print("Iterative Imputer norm minimization MSE: %f" % ii_mse)
+
 nnm_mse = ((X_filled_nnm[missing_mask] - X[missing_mask]) ** 2).mean()
 print("Nuclear norm minimization MSE: %f" % nnm_mse)
 
@@ -46,7 +54,7 @@ on features for which two rows both have observed data.
 
 * `IterativeSVD`: Matrix completion by iterative low-rank SVD decomposition. Should be similar to SVDimpute from [Missing value estimation methods for DNA microarrays](http://www.ncbi.nlm.nih.gov/pubmed/11395428) by Troyanskaya et. al.
 
-* `MICE`: Reimplementation of [Multiple Imputation by Chained Equations](http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3074241/).
+* `IterativeImputer`: A strategy for imputing missing values by modeling each feature with missing values as a function of other features in a round-robin fashion.
 
 * `MatrixFactorization`: Direct factorization of the incomplete matrix into low-rank `U` and `V`, with an L1 sparsity penalty on the elements of `U` and an L2 penalty on the elements of `V`. Solved by gradient descent.
 
@@ -56,3 +64,52 @@ on features for which two rows both have observed data.
 * `BiScaler`: Iterative estimation of row/column means and standard deviations to get doubly normalized
 matrix. Not guaranteed to converge but works well in practice. Taken from [Matrix Completion and Low-Rank SVD via Fast Alternating Least Squares](http://arxiv.org/abs/1410.2596).
 
+
+## Note about Multiple vs. Single Imputation
+(From `scikit-learn`'s documentation)
+
+In the statistics community, it is common practice to perform multiple imputations,
+generating, for example, ``m`` separate imputations for a single feature matrix.
+Each of these ``m`` imputations is then put through the subsequent analysis pipeline
+(e.g. feature engineering, clustering, regression, classification). The ``m`` final
+analysis results (e.g. held-out validation errors) allow the data scientist
+to obtain understanding of how analytic results may differ as a consequence
+of the inherent uncertainty caused by the missing values. The above practice
+is called multiple imputation.
+
+Our implementation of `IterativeImputer` was inspired by the R MICE
+package (Multivariate Imputation by Chained Equations) [1], but differs from
+it by returning a single imputation instead of multiple imputations.  However,
+IterativeImputer` can also be used for multiple imputations by applying
+it repeatedly to the same dataset with different random seeds when
+``sample_posterior=True``. A quick example:
+
+```python
+import numpy as np
+from fancyimpute import IterativeImputer
+
+XY_incomplete = ... # insert your data here
+
+n_imputations = 5
+XY_completed = []
+for i in range(n_imputations):
+    imputer = IterativeImputer(n_iter=5, sample_posterior=True, random_state=i)
+    XY_completed.append(imputer.complete(XY_incomplete))
+    
+XY_completed_mean = np.mean(XY_completed, 0)
+XY_completed_std = np.std(XY_completed, 0)
+```
+
+See [2], chapter 4 for more discussion on multiple
+vs. single imputations. 
+
+It is still an open problem as to how useful single vs. multiple imputation is in
+the context of prediction and classification when the user is not interested in
+measuring uncertainty due to missing values.
+
+[1] Stef van Buuren, Karin Groothuis-Oudshoorn (2011). "mice: Multivariate
+   Imputation by Chained Equations in R". Journal of Statistical Software 45:
+   1-67.
+   
+[2] Roderick J A Little and Donald B Rubin (1986). "Statistical Analysis
+    with Missing Data". John Wiley & Sons, Inc., New York, NY, USA.

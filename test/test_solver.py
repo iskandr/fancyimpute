@@ -5,6 +5,7 @@ import warnings
 
 def test_prepare_input_data():
 	_solver = Solver()
+	print(_solver) # for improved coverage
 	# test that a complete matrix returns a warning
 	X1 = np.zeros((5, 5))
 	with warnings.catch_warnings(record=True) as w:
