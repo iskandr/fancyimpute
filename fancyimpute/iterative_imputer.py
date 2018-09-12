@@ -453,8 +453,6 @@ class IterativeImputer(Solver):
     A strategy for imputing missing values by modeling each feature with
     missing values as a function of other features in a round-robin fashion.
 
-    Read more in the :ref:`User Guide <iterative_imputer>`.
-
     Parameters
     ----------
     missing_values : int, np.nan, optional (default=np.nan)
@@ -480,7 +478,8 @@ class IterativeImputer(Solver):
         computed during the final round. A round is a single imputation of each
         feature with missing values.
 
-    predictor : estimator object, default=RidgeCV() or BayesianRidge()
+    predictor : estimator object, default=sklearn.linear.RidgeCV()
+                                  or sklearn.linear.BayesianRidge()
         The predictor to use at each step of the round-robin imputation.
         If ``sample_posterior`` is True, the predictor must support
         ``return_std`` in its ``predict`` method. Also, if
@@ -525,7 +524,6 @@ class IterativeImputer(Solver):
         selection of predictor features if n_nearest_features is not None, the
         ``imputation_order`` if ``random``, and the sampling from posterior if
         ``sample_posterior`` is True. Use an integer for determinism.
-        See :term:`the Glossary <random_state>`.
 
     Attributes
     ----------
