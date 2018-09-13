@@ -16,6 +16,21 @@ def test_iterative_imputer_with_low_rank_random_matrix():
     assert missing_mae < 0.1, "Error too high with IterativeImputer method!"
 
 
+def test_iterative_imputer_train_test_with_low_rank_random_matrix():
+    XY_incomplete_train = XY_incomplete[:250]
+    XY_incomplete_test = XY_incomplete[250:]
+    XY_test = XY[250:]
+    imputer = IterativeImputer(n_iter=50, random_state=0)
+    imputer.fit(XY_incomplete_train)
+    XY_completed_test = imputer.transform(XY_incomplete_test)
+    _, missing_mae = reconstruction_error(
+        XY_test,
+        XY_completed_test,
+        missing_mask,
+        name="IterativeImputer Train/Test")
+    assert missing_mae < 0.1, "Error too high with IterativeImputer train/test method!"
+
+
 def test_iterative_imputer_with_low_rank_random_matrix_approximate():
     imputer = IterativeImputer(n_iter=50, n_nearest_features=5, random_state=0)
     XY_completed = imputer.fit_transform(XY_incomplete)
@@ -44,5 +59,6 @@ def test_iterative_imputer_as_mice_with_low_rank_random_matrix_approximate():
 
 if __name__ == "__main__":
     test_iterative_imputer_with_low_rank_random_matrix()
+    test_iterative_imputer_train_test_with_low_rank_random_matrix()
     test_iterative_imputer_with_low_rank_random_matrix_approximate()
     test_iterative_imputer_as_mice_with_low_rank_random_matrix_approximate()
