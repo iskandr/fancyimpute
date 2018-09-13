@@ -7,7 +7,7 @@ from fancyimpute import IterativeImputer
 
 def test_iterative_imputer_with_low_rank_random_matrix():
     imputer = IterativeImputer(n_iter=50, random_state=0)
-    XY_completed = imputer.complete(XY_incomplete)
+    XY_completed = imputer.fit_transform(XY_incomplete)
     _, missing_mae = reconstruction_error(
         XY,
         XY_completed,
@@ -18,7 +18,7 @@ def test_iterative_imputer_with_low_rank_random_matrix():
 
 def test_iterative_imputer_with_low_rank_random_matrix_approximate():
     imputer = IterativeImputer(n_iter=50, n_nearest_features=5, random_state=0)
-    XY_completed = imputer.complete(XY_incomplete)
+    XY_completed = imputer.fit_transform(XY_incomplete)
     _, missing_mae = reconstruction_error(
         XY,
         XY_completed,
@@ -33,7 +33,7 @@ def test_iterative_imputer_as_mice_with_low_rank_random_matrix_approximate():
     XY_completed = []
     for i in range(n_imputations):
         imputer = IterativeImputer(n_iter=5, sample_posterior=True, random_state=i)
-        XY_completed.append(imputer.complete(XY_incomplete))
+        XY_completed.append(imputer.fit_transform(XY_incomplete))
     _, missing_mae = reconstruction_error(
         XY,
         np.mean(XY_completed, axis=0),

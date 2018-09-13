@@ -5,7 +5,7 @@ from fancyimpute import SoftImpute
 
 def test_soft_impute_with_low_rank_random_matrix():
     solver = SoftImpute()
-    XY_completed = solver.complete(XY_incomplete)
+    XY_completed = solver.fit_transform(XY_incomplete)
     _, missing_mae = reconstruction_error(
         XY,
         XY_completed,

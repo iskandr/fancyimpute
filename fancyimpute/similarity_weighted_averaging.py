@@ -152,7 +152,7 @@ class SimilarityWeightedAveraging(object):
             result = transpose_nested_dictionary(result)
         return result
 
-    def complete(self, X):
+    def fit_transform(self, X):
         X = check_array(X, force_all_finite=False)
 
         if self.verbose:

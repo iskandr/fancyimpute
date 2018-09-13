@@ -12,8 +12,7 @@ from fancyimpute import (
     SoftImpute,
     BiScaler,
     KNN,
-    MICE,
-    BayesianRidgeRegression,
+    IterativeImputer,
 )
 from fancyimpute.common import masked_mae, masked_mse
 
@@ -172,7 +171,7 @@ class ResultsTable(object):
 
     def add_entry(self, solver, name):
         print("Running %s" % name)
-        completed_normalized = solver.complete(self.incomplete_normalized)
+        completed_normalized = solver.fit_transform(self.incomplete_normalized)
         completed = self.normalizer.inverse_transform(completed_normalized)
 
         mae = masked_mae(
@@ -266,14 +265,12 @@ if __name__ == "__main__":
     for negative_log_regularization_weight in [2, 3, 4]:
         regularization_weight = 10.0 ** -negative_log_regularization_weight
         table.add_entry(
-            solver=MICE(
+            solver=IterativeImputer(
                 n_nearest_columns=80,
-                n_imputations=100,
+                n_iter=50,
                 n_burn_in=5,
-                model=BayesianRidgeRegression(lambda_reg=regularization_weight),
-                init_fill_method="mean",
             ),
-            name="MICE_%d" % negative_log_regularization_weight)
+            name="IterativeImputer_%d" % negative_log_regularization_weight)
 
     for fill_method in ["mean", "median"]:
         table.add_entry(

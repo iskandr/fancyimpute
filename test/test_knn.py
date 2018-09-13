@@ -13,7 +13,7 @@ def test_knn():
     print("MAD zero-fill = ", mad_zero_fill)
     for k in [5, 15, 30]:
         print("-- k=", k)
-        XY_completed = KNN(k).complete(XY_incomplete)
+        XY_completed = KNN(k).fit_transform(XY_incomplete)
         mask = np.isfinite(XY_completed)
         eq_((~mask).sum(), 0)
         diff = (XY_completed - XY)[missing_mask]

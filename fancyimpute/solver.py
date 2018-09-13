@@ -165,7 +165,15 @@ class Solver(object):
         raise ValueError("%s.solve not yet implemented!" % (
             self.__class__.__name__,))
 
-    def complete(self, X):
+    def fit_transform(self, X, y=None):
+        """
+        Fit the imputer and then transform input `X`
+
+        Note: all imputations should have a `fit_transform` method,
+        but only some (like IterativeImputer) also support inductive mode
+        using `fit` or `fit_transform` on `X_train` and then `transform`
+        on new `X_test`.
+        """
         X_original, missing_mask = self.prepare_input_data(X)
         observed_mask = ~missing_mask
         X = X_original.copy()
@@ -188,3 +196,29 @@ class Solver(object):
         X_result = self.project_result(X=X_result)
         X_result[observed_mask] = X_original[observed_mask]
         return X_result
+
+    def fit(self, X, y=None):
+        """
+        Fit the imputer on input `X`.
+
+        Note: all imputations should have a `fit_transform` method,
+        but only some (like IterativeImputer) also support inductive mode
+        using `fit` or `fit_transform` on `X_train` and then `transform`
+        on new `X_test`.
+        """
+        raise ValueError("%s.fit not implemented! This imputation algorithm likely"
+                         "doesn't support inductive mode." % (
+            self.__class__.__name__,))
+
+    def transform(self, X, y=None):
+        """
+        Transform input `X`.
+
+        Note: all imputations should have a `fit_transform` method,
+        but only some (like IterativeImputer) also support inductive mode
+        using `fit` or `fit_transform` on `X_train` and then `transform`
+        on new `X_test`.
+        """
+        raise ValueError("%s.transform not implemented! This imputation algorithm likely"
+                         "doesn't support inductive mode." % (
+            self.__class__.__name__,))
