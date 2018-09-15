@@ -985,24 +985,6 @@ class IterativeImputer(Solver):
         Xt[~mask_missing_values] = X[~mask_missing_values]
         return Xt
 
-    def complete(self, X, y=None):
-        """Completes X.
-
-        Parameters
-        ----------
-        X : array-like, shape (n_samples, n_features)
-            Input data, where "n_samples" is the number of samples and
-            "n_features" is the number of features.
-
-        y : ignored.
-
-        Returns
-        -------
-        Xt : array-like, shape (n_samples, n_features)
-             The imputed input data.
-        """
-        return self.fit_transform(X)
-
 
     def fit(self, X, y=None):
         """Fits the imputer on X and return self.

@@ -10,7 +10,7 @@ def test_matrix_factorization_with_low_rank_random_matrix():
         rank=3,
         l2_penalty=0,
         min_improvement=1e-6)
-    XY_completed = solver.complete(XY_incomplete)
+    XY_completed = solver.fit_transform(XY_incomplete)
     _, missing_mae = reconstruction_error(
         XY,
         XY_completed,

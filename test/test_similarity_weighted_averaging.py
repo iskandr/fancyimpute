@@ -17,7 +17,7 @@ def test_similarity_weighted_column_averaging():
     missing_mask = np.isnan(X_incomplete)
 
     solver = SimilarityWeightedAveraging()
-    X_filled = solver.complete(X_incomplete)
+    X_filled = solver.fit_transform(X_incomplete)
     eq_(X_incomplete.shape, X_filled.shape)
     diff = (X - X_filled)[missing_mask]
     abs_diff = np.abs(diff)

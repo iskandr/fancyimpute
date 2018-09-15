@@ -2,6 +2,7 @@ import numpy as np
 from fancyimpute import (
     BiScaler,
     KNN,
+    IterativeImputer,
     NuclearNormMinimization,
     SoftImpute,
     SimpleFill
@@ -20,15 +21,19 @@ X_incomplete = X.copy()
 X_incomplete[missing_mask] = np.nan
 
 meanFill = SimpleFill("mean")
-X_filled_mean = meanFill.complete(X_incomplete)
+X_filled_mean = meanFill.fit_transform(X_incomplete)
+
+# Model each feature with missing values as a function of other features, and
+# use that estimate for imputation.
+X_filled_ii = IterativeImputer().fit_transform(X_incomplete)
 
 # Use 3 nearest rows which have a feature to fill in each row's missing features
 knnImpute = KNN(k=3)
-X_filled_knn = knnImpute.complete(X_incomplete)
+X_filled_knn = knnImpute.fit_transform(X_incomplete)
 
 # matrix completion using convex optimization to find low-rank solution
 # that still matches observed values. Slow!
-X_filled_nnm = NuclearNormMinimization().complete(X_incomplete)
+X_filled_nnm = NuclearNormMinimization().fit_transform(X_incomplete)
 
 # Instead of solving the nuclear norm objective directly, instead
 # induce sparsity using singular value thresholding
@@ -41,15 +46,19 @@ biscaler = BiScaler()
 # rescale both rows and columns to have zero mean and unit variance
 X_incomplete_normalized = biscaler.fit_transform(X_incomplete)
 
-X_filled_softimpute_normalized = softImpute.complete(X_incomplete_normalized)
+X_filled_softimpute_normalized = softImpute.fit_transform(X_incomplete_normalized)
 X_filled_softimpute = biscaler.inverse_transform(X_filled_softimpute_normalized)
 
-X_filled_softimpute_no_biscale = softImpute.complete(X_incomplete)
+X_filled_softimpute_no_biscale = softImpute.fit_transform(X_incomplete)
 
 meanfill_mse = ((X_filled_mean[missing_mask] - X[missing_mask]) ** 2).mean()
 print("meanFill MSE: %f" % meanfill_mse)
 
+# print mean squared error for the four imputation methods above
 # print mean squared error for the three imputation methods above
+ii_mse = ((X_filled_ii[missing_mask] - X[missing_mask]) ** 2).mean()
+print("Iterative Imputer norm minimization MSE: %f" % ii_mse)
+
 nnm_mse = ((X_filled_nnm[missing_mask] - X[missing_mask]) ** 2).mean()
 print("Nuclear norm minimization MSE: %f" % nnm_mse)
 
