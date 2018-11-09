@@ -28,9 +28,6 @@ before_install:
 addons:
   apt:
     packages:
-    # install pandoc for use with pypandoc for converting the README
-    # from markdown to RST
-    - pandoc
     # Even though I'm installing cvxopt via conda, still seem to need these:
     - liblapack-dev
     - libatlas-base-dev
@@ -41,7 +38,6 @@ install:
   - source activate test-environment
   - conda install -c cvxgrp scs=1.2.6
   - pip install tensorflow
-  - pip install pypandoc
   - pip install -r requirements.txt
   - pip install .
   - pip install coveralls

@@ -18,6 +18,7 @@ from .solver import Solver
 
 from sklearn.utils import check_array
 
+
 class NuclearNormMinimization(Solver):
     """
     Simple implementation of "Exact Matrix Completion via Convex Optimization"

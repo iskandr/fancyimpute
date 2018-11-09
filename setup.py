@@ -12,34 +12,37 @@
 
 import os
 import logging
+import re
 
 from setuptools import setup
+
+package_name = "fancyimpute"
+
 
 readme_dir = os.path.dirname(__file__)
 readme_filename = os.path.join(readme_dir, 'README.md')
 
 try:
     with open(readme_filename, 'r') as f:
-        readme = f.read()
+        readme_markdown = f.read()
 except:
     logging.warn("Failed to load %s" % readme_filename)
-    readme = ""
+    readme_markdown = ""
 
-try:
-    import pypandoc
-    readme = pypandoc.convert(readme, to='rst', format='md')
-except:
-    logging.warn("Conversion of long_description from MD to RST failed")
-    pass
+with open('%s/__init__.py' % package_name, 'r') as f:
+    version = re.search(
+        r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
+        f.read(),
+        re.MULTILINE).group(1)
 
 if __name__ == '__main__':
     setup(
-        name='fancyimpute',
-        version="0.4.0",
+        name=package_name,
+        version=version,
         description="Matrix completion and feature imputation algorithms",
         author="Alex Rubinsteyn, Sergey Feldman",
         author_email="alex.rubinsteyn@gmail.com",
-        url="https://github.com/hammerlab/fancyimpute",
+        url="https://github.com/openvax/%s" % package_name,
         license="http://www.apache.org/licenses/LICENSE-2.0.html",
         classifiers=[
             'Development Status :: 3 - Alpha',
@@ -64,6 +67,7 @@ if __name__ == '__main__':
             'np_utils',
             'tensorflow',
         ],
-        long_description=readme,
-        packages=['fancyimpute'],
+        long_description=readme_markdown,
+        long_description_content_type='text/markdown',
+        packages=[package_name],
     )

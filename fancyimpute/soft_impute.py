@@ -22,6 +22,7 @@ from .solver import Solver
 
 F32PREC = np.finfo(np.float32).eps
 
+
 class SoftImpute(Solver):
     """
     Implementation of the SoftImpute algorithm from:

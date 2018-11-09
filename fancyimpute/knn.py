@@ -18,6 +18,7 @@ from sklearn.utils import check_array
 
 from .solver import Solver
 
+
 class KNN(Solver):
     """
     k-Nearest Neighbors imputation for arrays with missing data.

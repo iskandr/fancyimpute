@@ -13,7 +13,7 @@ from fancyimpute import KNN, NuclearNormMinimization, SoftImpute, IterativeImput
 # X is the complete data matrix
 # X_incomplete has the same values as X except a subset have been replace with NaN
 
-# Model each feature with missing values as a function of other features, and 
+# Model each feature with missing values as a function of other features, and
 # use that estimate for imputation.
 X_filled_ii = IterativeImputer().fit_transform(X_incomplete)
 
@@ -66,10 +66,10 @@ matrix. Not guaranteed to converge but works well in practice. Taken from [Matri
 
 ## Note about Inductive vs Transductive Imputation
 Most imputation algorithms in `fancyimpute` are *transductive*. In the elegant language of `scikit-learn`'s API
-this means that you can only call `solver.fit_transform(X_incomplete)`, but then the "fitted" `solver` will not 
+this means that you can only call `solver.fit_transform(X_incomplete)`, but then the "fitted" `solver` will not
 be able to be applied to new data via a call to `solver.transform`. A simple example is the `MatrixFactorization`
-imputer, which decomposes as follows: `<A,B> = X_incomplete`, such that the product of `A` and `B` is close 
-to `X_incomplete` on its non-missing values. How then, can we apply the learned `A` and `B` matrices to 
+imputer, which decomposes as follows: `<A,B> = X_incomplete`, such that the product of `A` and `B` is close
+to `X_incomplete` on its non-missing values. How then, can we apply the learned `A` and `B` matrices to
 held-out data? It is not doable in general, but there are special cases. `fancyimpute` aims to be of general
 use and we have not implemented an inductive mode for `MatrixFactorization`.
 
@@ -108,13 +108,13 @@ XY_completed = []
 for i in range(n_imputations):
     imputer = IterativeImputer(n_iter=5, sample_posterior=True, random_state=i)
     XY_completed.append(imputer.fit_transform(XY_incomplete))
-    
+
 XY_completed_mean = np.mean(XY_completed, 0)
 XY_completed_std = np.std(XY_completed, 0)
 ```
 
 See [2], chapter 4 for more discussion on multiple
-vs. single imputations. 
+vs. single imputations.
 
 It is still an open problem as to how useful single vs. multiple imputation is in
 the context of prediction and classification when the user is not interested in
@@ -123,6 +123,6 @@ measuring uncertainty due to missing values.
 [1] Stef van Buuren, Karin Groothuis-Oudshoorn (2011). "mice: Multivariate
    Imputation by Chained Equations in R". Journal of Statistical Software 45:
    1-67.
-   
+
 [2] Roderick J A Little and Donald B Rubin (1986). "Statistical Analysis
     with Missing Data". John Wiley & Sons, Inc., New York, NY, USA.

@@ -21,6 +21,7 @@ from .common import masked_mae
 
 F32PREC = np.finfo(np.float32).eps
 
+
 class IterativeSVD(Solver):
     def __init__(
             self,
