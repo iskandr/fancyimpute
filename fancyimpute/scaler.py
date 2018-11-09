@@ -16,6 +16,7 @@ from six.moves import range
 
 import numpy as np
 
+
 class Scaler(object):
     """
     Iterative estimation of row and column centering/scaling

@@ -206,10 +206,11 @@ class Solver(object):
         using `fit` or `fit_transform` on `X_train` and then `transform`
         on new `X_test`.
         """
-        raise ValueError("%s.fit not implemented! This imputation algorithm likely "
-                         "doesn't support inductive mode. Only fit_transform is "
-                         "supported at this time." % (
-            self.__class__.__name__,))
+        raise ValueError(
+            "%s.fit not implemented! This imputation algorithm likely "
+            "doesn't support inductive mode. Only fit_transform is "
+            "supported at this time." % (
+                self.__class__.__name__,))
 
     def transform(self, X, y=None):
         """
@@ -220,7 +221,8 @@ class Solver(object):
         using `fit` or `fit_transform` on `X_train` and then `transform`
         on new `X_test`.
         """
-        raise ValueError("%s.transform not implemented! This imputation algorithm likely "
-                         "doesn't support inductive mode. Only %s.fit_transform is "
-                         "supported at this time." % (
-            self.__class__.__name__,))
+        raise ValueError(
+            "%s.transform not implemented! This imputation algorithm likely "
+            "doesn't support inductive mode. Only %s.fit_transform is "
+            "supported at this time." % (
+                self.__class__.__name__,))

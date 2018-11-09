@@ -11,6 +11,8 @@ from .scaler import BiScaler
 from .knn import KNN
 from .similarity_weighted_averaging import SimilarityWeightedAveraging
 
+__version__ = "0.4.1"
+
 __all__ = [
     "Solver",
     "NuclearNormMinimization",
