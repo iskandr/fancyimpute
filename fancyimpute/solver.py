@@ -225,4 +225,4 @@ class Solver(object):
             "%s.transform not implemented! This imputation algorithm likely "
             "doesn't support inductive mode. Only %s.fit_transform is "
             "supported at this time." % (
-                self.__class__.__name__,))
+                self.__class__.__name__, self.__class__.__name__))
