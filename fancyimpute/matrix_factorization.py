@@ -91,7 +91,8 @@ class MatrixFactorization(Solver):
             rank=self.rank,
             input_dim_i=n_samples,
             input_dim_j=n_features,
-            embeddings_regularizer=regularizers.l2(self.l2_penalty)
+            embeddings_regularizer=regularizers.l2(self.l2_penalty),
+            use_bias=self.use_bias
         )(main_input)
         model = Model(inputs=main_input, outputs=embed)
         optimizer = import_from(
