@@ -6,7 +6,6 @@ env:
     - CUDA_VISIBLE_DEVICES=""
 matrix:
   include:
-    - python: 2.7
     - python: 3.6
 before_install:
   # Commands below copied from: http://conda.pydata.org/docs/travis.html
