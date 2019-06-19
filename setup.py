@@ -42,7 +42,7 @@ if __name__ == '__main__':
         description="Matrix completion and feature imputation algorithms",
         author="Alex Rubinsteyn, Sergey Feldman",
         author_email="alex.rubinsteyn@gmail.com",
-        url="https://github.com/openvax/%s" % package_name,
+        url="https://github.com/iskandr/%s" % package_name,
         license="http://www.apache.org/licenses/LICENSE-2.0.html",
         classifiers=[
             'Development Status :: 3 - Alpha',
@@ -61,7 +61,7 @@ if __name__ == '__main__':
             'scipy',
             # used by NuclearNormMinimization
             'cvxpy>=1.0.6',
-            'scikit-learn>=0.19.1',
+            'scikit-learn>=0.21.2',
             # used by MatrixFactorization
             'keras>=2.0.0',
             'np_utils',
