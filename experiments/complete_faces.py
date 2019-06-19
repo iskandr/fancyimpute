@@ -4,6 +4,7 @@ from collections import defaultdict
 
 import pylab
 from sklearn.datasets import fetch_lfw_people
+from sklearn.impute import IterativeImputer
 import numpy as np
 
 from fancyimpute import (
@@ -11,9 +12,9 @@ from fancyimpute import (
     IterativeSVD,
     SoftImpute,
     BiScaler,
-    KNN,
-    IterativeImputer,
+    KNN
 )
+
 from fancyimpute.common import masked_mae, masked_mse
 
 
@@ -266,9 +267,8 @@ if __name__ == "__main__":
         regularization_weight = 10.0 ** -negative_log_regularization_weight
         table.add_entry(
             solver=IterativeImputer(
-                n_nearest_columns=80,
-                n_iter=50,
-                n_burn_in=5,
+                n_nearest_features=80,
+                max_iter=50
             ),
             name="IterativeImputer_%d" % negative_log_regularization_weight)
 

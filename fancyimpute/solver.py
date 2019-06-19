@@ -170,8 +170,8 @@ class Solver(object):
         Fit the imputer and then transform input `X`
 
         Note: all imputations should have a `fit_transform` method,
-        but only some (like IterativeImputer) also support inductive mode
-        using `fit` or `fit_transform` on `X_train` and then `transform`
+        but only some (like IterativeImputer in sklearn) also support inductive
+        mode using `fit` or `fit_transform` on `X_train` and then `transform`
         on new `X_test`.
         """
         X_original, missing_mask = self.prepare_input_data(X)
@@ -202,8 +202,8 @@ class Solver(object):
         Fit the imputer on input `X`.
 
         Note: all imputations should have a `fit_transform` method,
-        but only some (like IterativeImputer) also support inductive mode
-        using `fit` or `fit_transform` on `X_train` and then `transform`
+        but only some (like IterativeImputer in sklearn) also support inductive
+        mode using `fit` or `fit_transform` on `X_train` and then `transfor`
         on new `X_test`.
         """
         raise ValueError(
@@ -217,8 +217,8 @@ class Solver(object):
         Transform input `X`.
 
         Note: all imputations should have a `fit_transform` method,
-        but only some (like IterativeImputer) also support inductive mode
-        using `fit` or `fit_transform` on `X_train` and then `transform`
+        but only some (like IterativeImputer in sklearn) also support inductive
+        mode using `fit` or `fit_transform` on `X_train` and then `transform`
         on new `X_test`.
         """
         raise ValueError(

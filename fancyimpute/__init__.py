@@ -2,7 +2,6 @@ from __future__ import absolute_import, print_function, division
 
 from .solver import Solver
 from .nuclear_norm_minimization import NuclearNormMinimization
-from .iterative_imputer import IterativeImputer
 from .matrix_factorization import MatrixFactorization
 from .iterative_svd import IterativeSVD
 from .simple_fill import SimpleFill
@@ -11,7 +10,7 @@ from .scaler import BiScaler
 from .knn import KNN
 from .similarity_weighted_averaging import SimilarityWeightedAveraging
 
-__version__ = "0.4.3"
+__version__ = "0.5.0"
 
 __all__ = [
     "Solver",
@@ -22,6 +21,5 @@ __all__ = [
     "SoftImpute",
     "BiScaler",
     "KNN",
-    "SimilarityWeightedAveraging",
-    "IterativeImputer"
+    "SimilarityWeightedAveraging"
 ]
