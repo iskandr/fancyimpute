@@ -203,7 +203,7 @@ class Solver(object):
 
         Note: all imputations should have a `fit_transform` method,
         but only some (like IterativeImputer in sklearn) also support inductive
-        mode using `fit` or `fit_transform` on `X_train` and then `transfor`
+        mode using `fit` or `fit_transform` on `X_train` and then `transform`
         on new `X_test`.
         """
         raise ValueError(
