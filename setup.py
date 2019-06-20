@@ -45,7 +45,7 @@ if __name__ == '__main__':
         url="https://github.com/iskandr/%s" % package_name,
         license="http://www.apache.org/licenses/LICENSE-2.0.html",
         classifiers=[
-            'Development Status :: 3 - Alpha',
+            'Development Status :: 3 - Beta',
             'Environment :: Console',
             'Operating System :: OS Independent',
             'Intended Audience :: Science/Research',
@@ -54,7 +54,6 @@ if __name__ == '__main__':
             'Topic :: Scientific/Engineering :: Bio-Informatics',
         ],
         install_requires=[
-            'six',
             'knnimpute',
             # need at least 1.10 for np.multi_dot
             'numpy>=1.10',
@@ -64,7 +63,6 @@ if __name__ == '__main__':
             'scikit-learn>=0.21.2',
             # used by MatrixFactorization
             'keras>=2.0.0',
-            'np_utils',
             'tensorflow',
         ],
         long_description=readme_markdown,

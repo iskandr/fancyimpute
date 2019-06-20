@@ -14,13 +14,11 @@
 Helper functions for incomplete matrices represented using dictionaries.
 """
 
-from __future__ import absolute_import, print_function, division
 from collections import defaultdict
 
-from six.moves import range
 import numpy as np
-
 from scipy.sparse import dok_matrix
+
 
 def dense_nan_matrix(shape, dtype):
     return np.ones(shape, dtype=dtype) * np.nan

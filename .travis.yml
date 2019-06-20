@@ -11,11 +11,7 @@ before_install:
   # Commands below copied from: http://conda.pydata.org/docs/travis.html
   # We do this conditionally because it saves us some downloading if the
   # version is the same.
-  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-      wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
-    else
-      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-    fi
+  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
   # reset the shell's lookup table for program name to path mappings
@@ -54,5 +50,4 @@ deploy:
     secure: "AAzTof2771B8tjg2PzCFfctNUbJ6BcQIkH3skpKJvoyWmL0U/fqnGF6zpK0QApJBqTX/xygYhLSfKWZ788FWwyaHW6Hgw8UQ1eHJPurjC9P8O/OWYRhK3r9J7dEPL4+uHfD67C7C+JGCl9BQk8+dRGYDOJ9kx32Eown8wtaoNY7ykLwq/mXsJcm+NjvfJzA7xE4TbGlL1RFDidUkwZ4YgWtGFcfEtVZlO+pEqeprLr/PBQap6K6WPA5yjQKziaqw5DSjMAU5TVDoZgIMu3/uxUJS6EGYs7FvRM961oEFXs9QvhDz+VtKr1kY8wGR1kJXes41NDr8fq9MqBAGcz3yxHeEP1wU1Aukfbw6QUQqQ7rUWFVKSqeVAq7Phirz7RHWslXl9dSoK2REQA3C8sXggmj198YhEq7QufxzTkD4KCDj+jutbMURZI5re6oetLqBz+8zExywXLKgVtTlUnokJ9R5Fnl0E1B4LMHXRvus71+vLQfv2gCt5OWRxzUfUFzpMdkXG2FDmjFGdBw6OWMhS1W+B19ht6Ho4SoN0Tj3YzvZt2AEwShm1i0LA8ITSN1lQdEucdz0kAhvXVRJtcGa4y48/uT9e8gzeyDyANvJ1RAbCsj3/kazucZH9I0b0lRyMiadtj7mfQwnU9MXCJzG7e912sGJDImyiTXqTQfw1Us="
   on:
     branch: master
-    condition: $TRAVIS_PYTHON_VERSION = "2.7"
-
+    condition: $TRAVIS_PYTHON_VERSION = "3.6"
