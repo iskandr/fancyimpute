@@ -10,7 +10,7 @@ from .scaler import BiScaler
 from .knn import KNN
 from .similarity_weighted_averaging import SimilarityWeightedAveraging
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 __all__ = [
     "Solver",

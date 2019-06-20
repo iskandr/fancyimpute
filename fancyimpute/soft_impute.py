@@ -10,9 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import, print_function, division
-
-from six.moves import range
 import numpy as np
 from sklearn.utils.extmath import randomized_svd
 from sklearn.utils import check_array
