@@ -37,7 +37,7 @@ class MatrixFactorization(Solver):
             self,
             rank=10,
             learning_rate=0.001,
-            epochs = 10000
+            epochs=10000,
             patience=5,
             l2_penalty=1e-5,
             use_bias=True,
