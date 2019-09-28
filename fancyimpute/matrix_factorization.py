@@ -37,6 +37,7 @@ class MatrixFactorization(Solver):
             self,
             rank=10,
             learning_rate=0.001,
+            epochs=10000,
             patience=5,
             l2_penalty=1e-5,
             use_bias=True,
@@ -55,6 +56,7 @@ class MatrixFactorization(Solver):
             normalizer=normalizer)
         self.rank = rank
         self.learning_rate = learning_rate
+        self.epochs = epochs
         self.patience = patience
         self.l2_penalty = l2_penalty
         self.use_bias = use_bias
@@ -102,7 +104,7 @@ class MatrixFactorization(Solver):
             ij_tr,
             y_tr,
             batch_size=int(len(y_tr) * (1 - self.validation_frac)),
-            epochs=10000,
+            epochs=self.epochs,
             validation_split=self.validation_frac,
             callbacks=callbacks,
             shuffle=True,
