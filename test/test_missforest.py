@@ -3,8 +3,8 @@
 from  fancyimpute import MissForest
 
 from low_rank_data import XY, XY_incomplete, missing_mask
-from low_rank_data import XY_categorical, XY_incomplete_categorical, missing_mask_categorical
-from low_rank_data import XY_mixed, XY_incomplete_mixed, missing_mask_mixed
+#from low_rank_data import XY_categorical, XY_incomplete_categorical, missing_mask_categorical
+#from low_rank_data import XY_mixed, XY_incomplete_mixed, missing_mask_mixed
 
 from common import reconstruction_error
 
