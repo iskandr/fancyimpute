@@ -1,7 +1,7 @@
 from __future__ import absolute_import, print_function, division
 
 from .solver import Solver
-#from .nuclear_norm_minimization import NuclearNormMinimization
+from .nuclear_norm_minimization import NuclearNormMinimization
 from .matrix_factorization import MatrixFactorization
 from .iterative_svd import IterativeSVD
 from .simple_fill import SimpleFill
@@ -20,7 +20,7 @@ __version__ = "0.5.4"
 
 __all__ = [
     "Solver",
-    #"NuclearNormMinimization",
+    "NuclearNormMinimization",
     "MatrixFactorization",
     "IterativeSVD",
     "SimpleFill",
