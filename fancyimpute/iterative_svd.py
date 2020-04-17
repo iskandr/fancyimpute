@@ -43,6 +43,7 @@ class IterativeSVD(Solver):
         self.convergence_threshold = convergence_threshold
         self.gradual_rank_increase = gradual_rank_increase
         self.verbose = verbose
+        self.tsvd = list()
 
     def _converged(self, X_old, X_new, missing_mask):
         # check for convergence
@@ -89,4 +90,58 @@ class IterativeSVD(Solver):
             X_filled[missing_mask] = X_reconstructed[missing_mask]
             if converged:
                 break
+        return X_filled
+
+    def fit(self, X, missing_mask):
+        """Similar to fit_transform but saves the model"""
+        X[missing_mask] = 0
+        X = check_array(X, force_all_finite=False)
+
+        observed_mask = ~missing_mask
+        X_filled = X
+        for i in range(self.max_iters):
+            # deviation from original svdImpute algorithm:
+            # gradually increase the rank of our approximation
+            if self.gradual_rank_increase:
+                curr_rank = min(2 ** i, self.rank)
+            else:
+                curr_rank = self.rank
+            tsvd = TruncatedSVD(curr_rank, algorithm=self.svd_algorithm)
+
+            self.tsvd.append(tsvd.fit(X_filled))
+            X_reduced = self.tsvd[i].transform(X_filled)
+            X_reconstructed = self.tsvd[i].inverse_transform(X_reduced)
+            X_reconstructed = self.clip(X_reconstructed)
+            mae = masked_mae(
+                X_true=X,
+                X_pred=X_reconstructed,
+                mask=observed_mask)
+            if self.verbose:
+                print(
+                    "[IterativeSVD] Iter %d: observed MAE=%0.6f" % (
+                        i + 1, mae))
+            converged = self._converged(
+                X_old=X_filled,
+                X_new=X_reconstructed,
+                missing_mask=missing_mask)
+            X_filled[missing_mask] = X_reconstructed[missing_mask]
+            if converged:
+                self.iterations = i + 1
+                break
+        return X_filled
+
+    def transform(self, X, missing_mask):
+        X[missing_mask] = 0
+        X = check_array(X, force_all_finite=False)
+        X_filled = X
+        for i in range(self.iterations):
+            # deviation from original svdImpute algorithm:
+            # gradually increase the rank of our approximation
+
+            X_reduced = self.tsvd[i].transform(X_filled)
+            X_reconstructed = self.tsvd[i].inverse_transform(X_reduced)
+            X_reconstructed = self.clip(X_reconstructed)
+
+            X_filled[missing_mask] = X_reconstructed[missing_mask]
+
         return X_filled

@@ -13,5 +13,20 @@ def test_iterative_svd_with_low_rank_random_matrix():
         name="IterativeSVD")
     assert missing_mae < 0.1, "Error too high!"
 
+    XY_completed = solver.fit(XY_incomplete, missing_mask)
+    _, missing_mae = reconstruction_error(
+        XY,
+        XY_completed,
+        missing_mask,
+        name="IterativeSVD")
+    assert missing_mae < 0.1, "Error too high!"
+
+    XY_completed = solver.transform(XY_incomplete, missing_mask)
+    _, missing_mae = reconstruction_error(
+        XY,
+        XY_completed,
+        missing_mask,
+        name="IterativeSVD")
+
 if __name__ == "__main__":
     test_iterative_svd_with_low_rank_random_matrix()
