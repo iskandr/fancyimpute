@@ -66,6 +66,7 @@ class MatrixFactorization(Solver):
         self.min_improvement = min_improvement
         self.normalizer = normalizer
         self.verbose = verbose
+        self.model = None
 
     def solve(self, X, missing_mask):
         X = check_array(X, force_all_finite=False)
@@ -116,5 +117,82 @@ class MatrixFactorization(Solver):
         j_ts = columns.flatten()[missing_mask_flat]
         ij_ts = np.vstack([i_ts, j_ts]).T  # input to factorizer
         X[i_ts, j_ts] = model.predict(ij_ts).T[0]
+
+        return X
+
+    def fit(self, X, missing_mask):
+        if self.normalizer is not None:
+            X = self.normalizer.fit_transform(X)
+        X[missing_mask] = 0
+        X = check_array(X, force_all_finite=False)
+
+        # shape data to fit into keras model
+        (n_samples, n_features) = X.shape
+        observed_mask = ~missing_mask
+        missing_mask_flat = missing_mask.flatten()
+        observed_mask_flat = observed_mask.flatten()
+
+        columns, rows = np.meshgrid(np.arange(n_features), np.arange(n_samples))
+
+        # training data
+        i_tr = rows.flatten()[observed_mask_flat]
+        j_tr = columns.flatten()[observed_mask_flat]
+        ij_tr = np.vstack([i_tr, j_tr]).T  # input to factorizer
+        y_tr = X.flatten()[observed_mask_flat]  # output of factorizer
+        ij_tr, y_tr = shuffle(ij_tr, y_tr)
+
+        # make a keras model
+        main_input = Input(shape=(2,), dtype='int32')
+        embed = KerasMatrixFactorizer(
+            rank=self.rank,
+            input_dim_i=n_samples,
+            input_dim_j=n_features,
+            embeddings_regularizer=regularizers.l2(self.l2_penalty),
+            use_bias=self.use_bias
+        )(main_input)
+        self.model = Model(inputs=main_input, outputs=embed)
+        optimizer = import_from(
+            'keras.optimizers', self.optimization_algorithm
+        )(lr=self.learning_rate)
+        self.model.compile(optimizer=optimizer, loss=self.loss)
+        callbacks = [EarlyStopping(patience=self.patience, min_delta=self.min_improvement)]
+        self.model.fit(
+            ij_tr,
+            y_tr,
+            batch_size=int(len(y_tr) * (1 - self.validation_frac)),
+            epochs=self.epochs,
+            validation_split=self.validation_frac,
+            callbacks=callbacks,
+            shuffle=True,
+            verbose=self.verbose
+        )
+
+        # reassemble the original X
+        i_ts = rows.flatten()[missing_mask_flat]
+        j_ts = columns.flatten()[missing_mask_flat]
+        ij_ts = np.vstack([i_ts, j_ts]).T  # input to factorizer
+        X[i_ts, j_ts] = self.model.predict(ij_ts).T[0]
+        X = self.project_result(X=X)
+
+        return X
+
+    def transform(self, X, missing_mask):
+        if self.normalizer is not None:
+            X = self.normalizer.transform(X)
+        X[missing_mask] = 0
+        X = check_array(X, force_all_finite=False)
+
+        # shape data to fit into keras model
+        (n_samples, n_features) = X.shape
+        missing_mask_flat = missing_mask.flatten()
+
+        columns, rows = np.meshgrid(np.arange(n_features), np.arange(n_samples))
+
+        # predict missing values
+        i_ts = rows.flatten()[missing_mask_flat]
+        j_ts = columns.flatten()[missing_mask_flat]
+        ij_ts = np.vstack([i_ts, j_ts]).T  # input to factorizer
+        X[i_ts, j_ts] = self.model.predict(ij_ts).T[0]
+        X = self.project_result(X=X)
 
         return X
