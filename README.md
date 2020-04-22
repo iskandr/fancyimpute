@@ -61,3 +61,7 @@ on features for which two rows both have observed data.
 
 * `BiScaler`: Iterative estimation of row/column means and standard deviations to get doubly normalized
 matrix. Not guaranteed to converge but works well in practice. Taken from [Matrix Completion and Low-Rank SVD via Fast Alternating Least Squares](http://arxiv.org/abs/1410.2596).
+
+### Induction Mode
+A few algorithms support induction mode where you can save the solver and then apply it to new test data. This mode is supported in `IterativeImputer` (by means of sklearn library),
+`MatrixFactorization`, `SimpleFill`, and `IterativeSVD`.
