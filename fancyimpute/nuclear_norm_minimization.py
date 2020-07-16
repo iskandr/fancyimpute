@@ -121,7 +121,7 @@ class NuclearNormMinimization(Solver):
         problem = cvxpy.Problem(objective, constraints)
         problem.solve(
             verbose=self.verbose,
-            solver=cvxpy.SCS,
+            solver=cvxpy.CVXOPT,
             max_iters=self.max_iters,
             # use_indirect, see: https://github.com/cvxgrp/cvxpy/issues/547
             use_indirect=False)
