@@ -1,5 +1,6 @@
 keras>=2.4.3
 cvxpy>=1.0.6
+cvxopt
 scikit-learn>=0.21.2
 numpy>=1.10
 scipy
