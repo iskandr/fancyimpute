@@ -42,7 +42,7 @@ class MatrixFactorization(Solver):
             l2_penalty=1e-5,
             use_bias=True,
             min_improvement=0.001,
-            optimization_algorithm="nadam",
+            optimization_algorithm="Nadam",
             loss='mse',
             validation_frac=0.1,
             min_value=None,
