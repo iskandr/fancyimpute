@@ -45,7 +45,7 @@ class SoftImpute(Solver):
             Value by which we shrink singular values on each iteration. If
             omitted then the default value will be the maximum singular
             value of the initialized matrix (zeros for missing values) divided
-            by 100.
+            by 50.
 
         convergence_threshold : float
             Minimum ration difference between iterations (as a fraction of
