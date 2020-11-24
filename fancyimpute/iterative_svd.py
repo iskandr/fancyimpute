@@ -12,6 +12,7 @@
 
 from sklearn.decomposition import TruncatedSVD
 from sklearn.utils import check_array
+from sklearn.utils.extmath import safe_sparse_dot
 import numpy as np
 
 from .solver import Solver
@@ -63,14 +64,20 @@ class IterativeSVD(Solver):
 
         observed_mask = ~missing_mask
         X_filled = X
+        curr_rank = 2
+        self.SVDfeatures = []
         for i in range(self.max_iters):
             # deviation from original svdImpute algorithm:
             # gradually increase the rank of our approximation
             if self.gradual_rank_increase:
-                curr_rank = min(2 ** i, self.rank)
+                curr_rank = min(2 * curr_rank, self.rank)
             else:
                 curr_rank = self.rank
+            # TODO: DO not use wrapped function TruncatedSVD,
+            # use randomized_svd directly. Possible speedup, possible
+            # stability issue if not all cases are covered.
             tsvd = TruncatedSVD(curr_rank, algorithm=self.svd_algorithm)
+
             X_reduced = tsvd.fit_transform(X_filled)
             X_reconstructed = tsvd.inverse_transform(X_reduced)
             X_reconstructed = self.clip(X_reconstructed)
@@ -78,15 +85,35 @@ class IterativeSVD(Solver):
                 X_true=X,
                 X_pred=X_reconstructed,
                 mask=observed_mask)
+
+            self.SVDfeatures.append(tsvd.components_)
+
             if self.verbose:
                 print(
-                    "[IterativeSVD] Iter %d: observed MAE=%0.6f" % (
-                        i + 1, mae))
+                    "[IterativeSVD] Iter %d: observed MAE=%0.6f, rank=%d" % (
+                        i + 1, mae, curr_rank))
             converged = self._converged(
                 X_old=X_filled,
                 X_new=X_reconstructed,
                 missing_mask=missing_mask)
             X_filled[missing_mask] = X_reconstructed[missing_mask]
+
             if converged:
                 break
         return X_filled
+
+    def fit(self, X):
+        missing_mask = np.isnan(X)
+        X_fitted = check_array(X, force_all_finite=False)
+        X_fitted = self.fill(X_fitted, missing_mask, inplace=True)
+        # raise NotImplementedError
+        for i, feature_basis in enumerate(self.SVDfeatures):
+            # Project data into feature space of i-th iteration
+            # Order of operation is optimized for case in which new data have
+            # more columns than rows.
+            X_new = safe_sparse_dot(safe_sparse_dot(X_fitted, feature_basis.T), feature_basis)
+            X_new = self.clip(X_new)
+            X_fitted[missing_mask] = X_new[missing_mask]
+
+        return X_fitted
+        # I have no idea what I am doing. 
