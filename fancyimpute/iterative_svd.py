@@ -102,7 +102,7 @@ class IterativeSVD(Solver):
                 break
         return X_filled
 
-    def fit(self, X):
+    def transform(self, X):
         missing_mask = np.isnan(X)
         X_fitted = check_array(X, force_all_finite=False)
         X_fitted = self.fill(X_fitted, missing_mask, inplace=True)
@@ -116,4 +116,3 @@ class IterativeSVD(Solver):
             X_fitted[missing_mask] = X_new[missing_mask]
 
         return X_fitted
-        # I have no idea what I am doing. 
