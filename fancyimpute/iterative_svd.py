@@ -104,7 +104,7 @@ class IterativeSVD(Solver):
 
     def transform(self, X):
         missing_mask = np.isnan(X)
-        X_fitted = check_array(X, force_all_finite=False)
+        X_fitted = check_array(X.copy(), force_all_finite=False)
         X_fitted = self.fill(X_fitted, missing_mask, inplace=True)
         # raise NotImplementedError
         for i, feature_basis in enumerate(self.SVDfeatures):
