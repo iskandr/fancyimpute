@@ -1,7 +1,8 @@
 [![Build Status](https://travis-ci.org/iskandr/fancyimpute.svg?branch=master)](https://travis-ci.org/iskandr/fancyimpute) [![Coverage Status](https://coveralls.io/repos/github/iskandr/fancyimpute/badge.svg?branch=master)](https://coveralls.io/github/iskandr/fancyimpute?branch=master) [![DOI](https://zenodo.org/badge/doi/10.5281/zenodo.51773.svg)](http://dx.doi.org/10.5281/zenodo.51773)
 
 
-# fancyimpute
+![plot](https://user-images.strikinglycdn.com/res/hrscywv4p/image/upload/c_limit,fl_lossy,h_1440,w_720,f_auto,q_auto/174108/654579_364680.png)
+
 
 A variety of matrix completion and imputation algorithms implemented in Python 3.6.
 
