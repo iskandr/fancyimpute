@@ -74,7 +74,7 @@ matrix. Not guaranteed to converge but works well in practice. Taken from [Matri
 ## Citation
 
 If you use `fancyimpute` in your academic publication, please cite it as follows:
-
+```bibtex
 @software{fancyimpute,
   author = {Alex Rubinsteyn and Sergey Feldman},
   title={fancyimpute: An Imputation Library for Python},
@@ -82,3 +82,4 @@ If you use `fancyimpute` in your academic publication, please cite it as follows
   version = {0.5.4},
   date = {2016},
 }
+```
