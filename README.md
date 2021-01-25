@@ -12,7 +12,7 @@ To install:
 
 Do *not* use conda. We don't support it.
 
-# Important Caveats
+## Important Caveats
 
 (1) This project is in "bare maintenance" mode. That means we are not planning on adding more imputation algorithms or features (but might if we get inspired). Please do report bugs, and we'll try to fix them. Also, we are happy to take pull requests for more algorithms and/or features. 
 
@@ -70,3 +70,15 @@ on features for which two rows both have observed data.
 
 * `BiScaler`: Iterative estimation of row/column means and standard deviations to get doubly normalized
 matrix. Not guaranteed to converge but works well in practice. Taken from [Matrix Completion and Low-Rank SVD via Fast Alternating Least Squares](http://arxiv.org/abs/1410.2596).
+
+## Citation
+
+If you use `fancyimpute` in your academic publication, please cite it as follows:
+
+@software{fancyimpute,
+  author = {Alex Rubinsteyn and Sergey Feldman},
+  title={fancyimpute: An Imputation Library for Python},
+  url = {https://github.com/iskandr/fancyimpute},
+  version = {0.5.4},
+  date = {2016},
+}
