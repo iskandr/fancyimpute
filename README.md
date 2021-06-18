@@ -10,7 +10,7 @@ To install:
 
 `pip install fancyimpute`
 
-Do *not* use conda. We don't support it.
+If you run into `tensorflow` problems and use anaconda, you can try to fix them with `conda install cudatoolkit`. 
 
 ## Important Caveats
 
