@@ -52,11 +52,11 @@ if __name__ == "__main__":
         ],
         install_requires=[
             "knnimpute==0.1.0",
-            "numpy==1.19.5",
-            "scipy==1.6.3",
+            "scikit-learn==0.24.2",
             # used by NuclearNormMinimization
             "cvxpy==1.1.13",
-            "scikit-learn==0.24.2",
+            "numpy==1.19.5",
+            "scipy==1.6.3",
             # used by MatrixFactorization
             "keras==2.4.3",
             "tensorflow==2.5",
