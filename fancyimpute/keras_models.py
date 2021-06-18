@@ -12,22 +12,14 @@
 
 import numpy as np
 
-from keras import backend as K
-from keras import regularizers
-from keras.engine import Layer
-from keras.initializers import RandomNormal
+from tensorflow.keras import backend as K
+from tensorflow.keras import regularizers
+from tensorflow.keras.layers import Layer
+from tensorflow.keras.initializers import RandomNormal
 
 
 class KerasMatrixFactorizer(Layer):
-    def __init__(
-            self,
-            rank,
-            input_dim_i,
-            input_dim_j,
-            embeddings_regularizer=None,
-            use_bias=True,
-            **kwargs
-    ):
+    def __init__(self, rank, input_dim_i, input_dim_j, embeddings_regularizer=None, use_bias=True, **kwargs):
         self.rank = rank
         self.input_dim_i = input_dim_i
         self.input_dim_j = input_dim_j
@@ -40,38 +32,30 @@ class KerasMatrixFactorizer(Layer):
         self.i_embedding = self.add_weight(
             shape=(self.input_dim_i, self.rank),
             initializer=RandomNormal(mean=0.0, stddev=1 / np.sqrt(self.rank)),
-            name='i_embedding',
-            regularizer=self.embeddings_regularizer
+            name="i_embedding",
+            regularizer=self.embeddings_regularizer,
         )
         self.j_embedding = self.add_weight(
             shape=(self.input_dim_j, self.rank),
             initializer=RandomNormal(mean=0.0, stddev=1 / np.sqrt(self.rank)),
-            name='j_embedding',
-            regularizer=self.embeddings_regularizer
+            name="j_embedding",
+            regularizer=self.embeddings_regularizer,
         )
         if self.use_bias:
-            self.i_bias = self.add_weight(
-                shape=(self.input_dim_i, 1),
-                initializer='zeros',
-                name='i_bias'
-            )
-            self.j_bias = self.add_weight(
-                shape=(self.input_dim_j, 1),
-                initializer='zeros',
-                name='j_bias'
-            )
+            self.i_bias = self.add_weight(shape=(self.input_dim_i, 1), initializer="zeros", name="i_bias")
+            self.j_bias = self.add_weight(shape=(self.input_dim_j, 1), initializer="zeros", name="j_bias")
             self.constant = self.add_weight(
                 shape=(1, 1),
-                initializer='zeros',
-                name='constant',
+                initializer="zeros",
+                name="constant",
             )
 
         self.built = True
         super(KerasMatrixFactorizer, self).build(input_shape)
 
     def call(self, inputs):
-        if K.dtype(inputs) != 'int32':
-            inputs = K.cast(inputs, 'int32')
+        if K.dtype(inputs) != "int32":
+            inputs = K.cast(inputs, "int32")
         # get the embeddings
         i = inputs[:, 0]  # by convention
         j = inputs[:, 1]
@@ -82,7 +66,7 @@ class KerasMatrixFactorizer(Layer):
         if self.use_bias:
             i_bias = K.gather(self.i_bias, i)
             j_bias = K.gather(self.j_bias, j)
-            out += (i_bias + j_bias + self.constant)
+            out += i_bias + j_bias + self.constant
         return out
 
     def compute_output_shape(self, input_shape):

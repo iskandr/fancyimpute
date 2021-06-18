@@ -20,22 +20,19 @@ package_name = "fancyimpute"
 
 
 readme_dir = os.path.dirname(__file__)
-readme_filename = os.path.join(readme_dir, 'README.md')
+readme_filename = os.path.join(readme_dir, "README.md")
 
 try:
-    with open(readme_filename, 'r') as f:
+    with open(readme_filename, "r") as f:
         readme_markdown = f.read()
 except:
     logging.warn("Failed to load %s" % readme_filename)
     readme_markdown = ""
 
-with open('%s/__init__.py' % package_name, 'r') as f:
-    version = re.search(
-        r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
-        f.read(),
-        re.MULTILINE).group(1)
+with open("%s/__init__.py" % package_name, "r") as f:
+    version = re.search(r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]', f.read(), re.MULTILINE).group(1)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     setup(
         name=package_name,
         version=version,
@@ -45,27 +42,27 @@ if __name__ == '__main__':
         url="https://github.com/iskandr/%s" % package_name,
         license="http://www.apache.org/licenses/LICENSE-2.0.html",
         classifiers=[
-            'Development Status :: 4 - Beta',
-            'Environment :: Console',
-            'Operating System :: OS Independent',
-            'Intended Audience :: Science/Research',
-            'License :: OSI Approved :: Apache Software License',
-            'Programming Language :: Python',
-            'Topic :: Scientific/Engineering :: Bio-Informatics',
+            "Development Status :: 4 - Beta",
+            "Environment :: Console",
+            "Operating System :: OS Independent",
+            "Intended Audience :: Science/Research",
+            "License :: OSI Approved :: Apache Software License",
+            "Programming Language :: Python",
+            "Topic :: Scientific/Engineering :: Bio-Informatics",
         ],
         install_requires=[
-            'knnimpute',
+            "knnimpute",
             # need at least 1.10 for np.multi_dot
-            'numpy>=1.10',
-            'scipy',
+            "numpy>=1.10",
+            "scipy",
             # used by NuclearNormMinimization
-            'cvxpy>=1.0.6',
-            'scikit-learn>=0.21.2',
+            "cvxpy>=1.0.6",
+            "scikit-learn>=0.24.2",
             # used by MatrixFactorization
-            'keras>=2.0.0',
-            'tensorflow',
+            "keras==2.4.3",
+            "tensorflow==2.5",
         ],
         long_description=readme_markdown,
-        long_description_content_type='text/markdown',
+        long_description_content_type="text/markdown",
         packages=[package_name],
     )

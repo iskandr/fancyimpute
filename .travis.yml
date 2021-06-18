@@ -29,10 +29,10 @@ addons:
 install:
   - >
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy keras scipy nose pandas matplotlib cvxopt scikit-learn
+      numpy keras=2.5 scipy nose pandas matplotlib cvxopt scikit-learn
   - source activate test-environment
   - conda install -c cvxgrp scs=1.2.6
-  - pip install tensorflow
+  - pip install tensorflow=2.5
   - pip install -r requirements.txt
   - pip install .
   - pip install coveralls
