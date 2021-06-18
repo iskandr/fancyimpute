@@ -51,13 +51,12 @@ if __name__ == "__main__":
             "Topic :: Scientific/Engineering :: Bio-Informatics",
         ],
         install_requires=[
-            "knnimpute",
-            # need at least 1.10 for np.multi_dot
-            "numpy>=1.10",
-            "scipy",
+            "knnimpute==0.1.0",
+            "numpy==1.19.5",
+            "scipy==1.6.3",
             # used by NuclearNormMinimization
-            "cvxpy>=1.0.6",
-            "scikit-learn>=0.24.2",
+            "cvxpy==1.1.13",
+            "scikit-learn==0.24.2",
             # used by MatrixFactorization
             "keras==2.4.3",
             "tensorflow==2.5",
