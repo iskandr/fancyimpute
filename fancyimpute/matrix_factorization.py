@@ -11,10 +11,10 @@
 # limitations under the License.
 
 import numpy as np
-from keras import regularizers
-from keras.callbacks import EarlyStopping
-from keras.layers import Input
-from keras.models import Model
+from tensorflow.keras import regularizers
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.layers import Input
+from tensorflow.keras.models import Model
 from sklearn.utils import shuffle, check_array
 
 from .common import import_from
@@ -34,26 +34,23 @@ class MatrixFactorization(Solver):
     """
 
     def __init__(
-            self,
-            rank=10,
-            learning_rate=0.001,
-            epochs=10000,
-            patience=5,
-            l2_penalty=1e-5,
-            use_bias=True,
-            min_improvement=0.001,
-            optimization_algorithm="Nadam",
-            loss='mse',
-            validation_frac=0.1,
-            min_value=None,
-            max_value=None,
-            normalizer=Scaler(),
-            verbose=True):
-        Solver.__init__(
-            self,
-            min_value=min_value,
-            max_value=max_value,
-            normalizer=normalizer)
+        self,
+        rank=10,
+        learning_rate=0.001,
+        epochs=10000,
+        patience=5,
+        l2_penalty=1e-5,
+        use_bias=True,
+        min_improvement=0.001,
+        optimization_algorithm="Nadam",
+        loss="mse",
+        validation_frac=0.1,
+        min_value=None,
+        max_value=None,
+        normalizer=Scaler(),
+        verbose=True,
+    ):
+        Solver.__init__(self, min_value=min_value, max_value=max_value, normalizer=normalizer)
         self.rank = rank
         self.learning_rate = learning_rate
         self.epochs = epochs
@@ -86,18 +83,16 @@ class MatrixFactorization(Solver):
         ij_tr, y_tr = shuffle(ij_tr, y_tr)
 
         # make a keras model
-        main_input = Input(shape=(2,), dtype='int32')
+        main_input = Input(shape=(2,), dtype="int32")
         embed = KerasMatrixFactorizer(
             rank=self.rank,
             input_dim_i=n_samples,
             input_dim_j=n_features,
             embeddings_regularizer=regularizers.l2(self.l2_penalty),
-            use_bias=self.use_bias
+            use_bias=self.use_bias,
         )(main_input)
         model = Model(inputs=main_input, outputs=embed)
-        optimizer = import_from(
-            'keras.optimizers', self.optimization_algorithm
-        )(lr=self.learning_rate)
+        optimizer = import_from("tensorflow.keras.optimizers", self.optimization_algorithm)(lr=self.learning_rate)
         model.compile(optimizer=optimizer, loss=self.loss)
         callbacks = [EarlyStopping(patience=self.patience, min_delta=self.min_improvement)]
         model.fit(
@@ -108,7 +103,7 @@ class MatrixFactorization(Solver):
             validation_split=self.validation_frac,
             callbacks=callbacks,
             shuffle=True,
-            verbose=self.verbose
+            verbose=self.verbose,
         )
 
         # reassemble the original X

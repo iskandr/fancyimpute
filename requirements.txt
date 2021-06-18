@@ -1,7 +1,7 @@
-keras>=2.4.3
-cvxpy>=1.0.6
-cvxopt
+tensorflow==2.5
+keras==2.4.3
+cvxpy==1.1.13
 scikit-learn>=0.21.2
-numpy>=1.10
-scipy
-knnimpute
+numpy==1.19.5
+scipy==1.6.3
+knnimpute==0.1.0
