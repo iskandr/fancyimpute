@@ -92,7 +92,7 @@ class MatrixFactorization(Solver):
             use_bias=self.use_bias,
         )(main_input)
         model = Model(inputs=main_input, outputs=embed)
-        optimizer = import_from("keras.optimizers", self.optimization_algorithm)(lr=self.learning_rate)
+        optimizer = import_from("tensorflow.keras.optimizers", self.optimization_algorithm)(lr=self.learning_rate)
         model.compile(optimizer=optimizer, loss=self.loss)
         callbacks = [EarlyStopping(patience=self.patience, min_delta=self.min_improvement)]
         model.fit(
