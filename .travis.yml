@@ -2,37 +2,11 @@ sudo: false  # Use container-based infrastructure
 language: python
 env:
   global:
-    - KERAS_BACKEND=tensorflow
     - CUDA_VISIBLE_DEVICES=""
 matrix:
   include:
     - python: 3.6
-before_install:
-  # Commands below copied from: http://conda.pydata.org/docs/travis.html
-  # We do this conditionally because it saves us some downloading if the
-  # version is the same.
-  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-  - bash miniconda.sh -b -p $HOME/miniconda
-  - export PATH="$HOME/miniconda/bin:$PATH"
-  # reset the shell's lookup table for program name to path mappings
-  - hash -r
-  - conda config --set always_yes yes --set changeps1 no
-  - conda update -q conda
-  # Useful for debugging any issues with conda
-  - conda info -a
-addons:
-  apt:
-    packages:
-    # Even though I'm installing cvxopt via conda, still seem to need these:
-    - liblapack-dev
-    - libatlas-base-dev
 install:
-  - >
-      conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-      numpy=1.19.5 keras=2.4.3 scipy nose pandas matplotlib cvxopt scikit-learn
-  - source activate test-environment
-  - conda install -c cvxgrp scs=1.2.6
-  - pip install tensorflow==2.5
   - pip install -r requirements.txt
   - pip install .
   - pip install coveralls
