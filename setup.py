@@ -10,13 +10,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import logging
+import os
 import re
 
 from setuptools import setup
 
-package_name = "fancyimpute"
+package_name = "fancySVD"
 
 
 readme_dir = os.path.dirname(__file__)
@@ -50,17 +50,7 @@ if __name__ == "__main__":
             "Programming Language :: Python",
             "Topic :: Scientific/Engineering :: Bio-Informatics",
         ],
-        install_requires=[
-            "knnimpute==0.1.0",
-            "scikit-learn==0.24.2",
-            # used by NuclearNormMinimization
-            "cvxpy==1.1.13",
-            "numpy==1.19.5",
-            "scipy==1.6.3",
-            # used by MatrixFactorization
-            "keras==2.4.3",
-            "tensorflow==2.5",
-        ],
+        install_requires=["scikit-learn==0.24.2", "numpy==1.19.5"],
         long_description=readme_markdown,
         long_description_content_type="text/markdown",
         packages=[package_name],

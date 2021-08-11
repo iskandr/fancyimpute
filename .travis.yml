@@ -39,7 +39,7 @@ install:
   - export PACKAGE_DIR=`pwd`
 script:
   - cd $PACKAGE_DIR
-  - nosetests test --with-coverage --cover-package=fancyimpute
+  - nosetests test --with-coverage --cover-package=fancySVD
 after_success:
   - coveralls
 deploy:

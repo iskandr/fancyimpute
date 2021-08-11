@@ -1,42 +1,26 @@
+from collections import defaultdict
 from os import mkdir
 from os.path import exists, join
-from collections import defaultdict
 
-import pylab
-from sklearn.datasets import fetch_lfw_people
-from sklearn.impute import IterativeImputer
 import numpy as np
-
-from fancyimpute import (
-    SimpleFill,
-    IterativeSVD,
-    SoftImpute,
-    BiScaler,
-    KNN
-)
-
-from fancyimpute.common import masked_mae, masked_mse
+import pylab
+from fancySVD import IterativeSVD
+from fancySVD.common import masked_mae, masked_mse
+from sklearn.datasets import fetch_lfw_people
 
 
-def remove_pixels(
-        full_images,
-        missing_square_size=32,
-        random_seed=0):
+def remove_pixels(full_images, missing_square_size=32, random_seed=0):
     np.random.seed(random_seed)
     incomplete_faces = []
     n_faces = len(full_images)
     height, width = full_images[0].shape[:2]
     for i in range(n_faces):
         image = full_images[i].copy()
-        start_x = np.random.randint(
-            low=0,
-            high=height - missing_square_size + 1)
-        start_y = np.random.randint(
-            low=0,
-            high=width - missing_square_size + 1)
+        start_x = np.random.randint(low=0, high=height - missing_square_size + 1)
+        start_y = np.random.randint(low=0, high=width - missing_square_size + 1)
         image[
-            start_x: start_x + missing_square_size,
-            start_y: start_y + missing_square_size] = np.nan
+            start_x : start_x + missing_square_size, start_y : start_y + missing_square_size
+        ] = np.nan
         incomplete_faces.append(image)
     return np.array(incomplete_faces, dtype=np.float32)
 
@@ -56,7 +40,7 @@ def color_balance(images):
     red = images[:, :, :, 0]
     green = images[:, :, :, 1]
     blue = images[:, :, :, 2]
-    combined = (red + green + blue)
+    combined = red + green + blue
     total_color = combined.sum()
     overall_fraction_red = red.sum() / total_color
     overall_fraction_green = green.sum() / total_color
@@ -77,19 +61,18 @@ def color_balance(images):
 
 
 class ResultsTable(object):
-
     def __init__(
-            self,
-            images_dict,
-            percent_missing=0.25,
-            saved_image_stride=25,
-            dirname="face_images",
-            scale_rows=False,
-            center_rows=False):
+        self,
+        images_dict,
+        percent_missing=0.25,
+        saved_image_stride=25,
+        dirname="face_images",
+        scale_rows=False,
+        center_rows=False,
+    ):
         self.images_dict = images_dict
         self.labels = list(sorted(images_dict.keys()))
-        self.images_array = np.array(
-            [images_dict[k] for k in self.labels]).astype("float32")
+        self.images_array = np.array([images_dict[k] for k in self.labels]).astype("float32")
         self.image_shape = self.images_array[0].shape
         self.width, self.height = self.image_shape[:2]
         self.color = (len(self.image_shape) == 3) and (self.image_shape[2] == 3)
@@ -98,8 +81,10 @@ class ResultsTable(object):
         self.n_pixels = self.width * self.height
         self.n_features = self.n_pixels * (3 if self.color else 1)
         self.n_images = len(self.images_array)
-        print("[ResultsTable] # images = %d, color=%s # features = %d, shape = %s" % (
-            self.n_images, self.color, self.n_features, self.image_shape))
+        print(
+            "[ResultsTable] # images = %d, color=%s # features = %d, shape = %s"
+            % (self.n_images, self.color, self.n_features, self.image_shape)
+        )
 
         self.flattened_array_shape = (self.n_images, self.n_features)
 
@@ -108,26 +93,27 @@ class ResultsTable(object):
         n_missing_pixels = int(self.n_pixels * percent_missing)
 
         missing_square_size = int(np.sqrt(n_missing_pixels))
-        print("[ResultsTable] n_missing_pixels = %d, missing_square_size = %d" % (
-            n_missing_pixels, missing_square_size))
+        print(
+            "[ResultsTable] n_missing_pixels = %d, missing_square_size = %d"
+            % (n_missing_pixels, missing_square_size)
+        )
         self.incomplete_images = remove_pixels(
-            self.images_array,
-            missing_square_size=missing_square_size)
-        print("[ResultsTable] Incomplete images shape = %s" % (
-            self.incomplete_images.shape,))
+            self.images_array, missing_square_size=missing_square_size
+        )
+        print("[ResultsTable] Incomplete images shape = %s" % (self.incomplete_images.shape,))
         self.flattened_incomplete_images = self.incomplete_images.reshape(
-            self.flattened_array_shape)
+            self.flattened_array_shape
+        )
         self.missing_mask = np.isnan(self.flattened_incomplete_images)
         self.normalizer = BiScaler(
             scale_rows=scale_rows,
             center_rows=center_rows,
             min_value=self.images_array.min(),
-            max_value=self.images_array.max())
-        self.incomplete_normalized = self.normalizer.fit_transform(
-            self.flattened_incomplete_images)
+            max_value=self.images_array.max(),
+        )
+        self.incomplete_normalized = self.normalizer.fit_transform(self.flattened_incomplete_images)
 
-        self.saved_image_indices = list(
-            range(0, self.n_images, saved_image_stride))
+        self.saved_image_indices = list(range(0, self.n_images, saved_image_stride))
         self.saved_images = defaultdict(dict)
         self.dirname = dirname
         self.mse_dict = {}
@@ -165,9 +151,7 @@ class ResultsTable(object):
             subdir = join(self.dirname, label)
             self.ensure_dir(subdir)
             path = join(subdir, filename)
-            figure.savefig(
-                path,
-                bbox_inches='tight')
+            figure.savefig(path, bbox_inches="tight")
             self.saved_images[i][base_filename] = path
 
     def add_entry(self, solver, name):
@@ -175,14 +159,8 @@ class ResultsTable(object):
         completed_normalized = solver.fit_transform(self.incomplete_normalized)
         completed = self.normalizer.inverse_transform(completed_normalized)
 
-        mae = masked_mae(
-            X_true=self.flattened_images,
-            X_pred=completed,
-            mask=self.missing_mask)
-        mse = masked_mse(
-            X_true=self.flattened_images,
-            X_pred=completed,
-            mask=self.missing_mask)
+        mae = masked_mae(X_true=self.flattened_images, X_pred=completed, mask=self.missing_mask)
+        mse = masked_mse(X_true=self.flattened_images, X_pred=completed, mask=self.missing_mask)
         print("==> %s: MSE=%0.4f MAE=%0.4f" % (name, mse, mae))
         self.mse_dict[name] = mse
         self.mae_dict[name] = mae
@@ -192,17 +170,17 @@ class ResultsTable(object):
         """
         Generator for (rank, name, MSE, MAE) sorted by increasing MAE
         """
-        for i, (name, mae) in enumerate(
-                sorted(self.mae_dict.items(), key=lambda x: x[1])):
-            yield(i + 1, name, self.mse_dict[name], self.mae_dict[name],)
+        for i, (name, mae) in enumerate(sorted(self.mae_dict.items(), key=lambda x: x[1])):
+            yield (
+                i + 1,
+                name,
+                self.mse_dict[name],
+                self.mae_dict[name],
+            )
 
     def print_sorted_errors(self):
         for (rank, name, mse, mae) in self.sorted_errors():
-            print("%d) %s: MSE=%0.4f MAE=%0.4f" % (
-                rank,
-                name,
-                mse,
-                mae))
+            print("%d) %s: MSE=%0.4f MAE=%0.4f" % (rank, name, mse, mae))
 
     def save_html_table(self, filename="results_table.html"):
         html = """
@@ -222,7 +200,12 @@ class ResultsTable(object):
                 <td>%0.4f</td>
                 <td>%0.4f</td>
             </tr>
-            """ % (rank, name, mse, mae)
+            """ % (
+                rank,
+                name,
+                mse,
+                mae,
+            )
         html += "</table>"
         self.ensure_dir(self.dirname)
         path = join(self.dirname, filename)
@@ -250,53 +233,18 @@ def image_per_label(images, label_indices, label_names, max_size=2000):
 def get_lfw(max_size=None):
     dataset = fetch_lfw_people(color=True)
     # keep only one image per person
-    return image_per_label(
-        dataset.images,
-        dataset.target,
-        dataset.target_names,
-        max_size=max_size)
+    return image_per_label(dataset.images, dataset.target, dataset.target_names, max_size=max_size)
+
 
 if __name__ == "__main__":
     images_dict = get_lfw(max_size=2000)
-    table = ResultsTable(
-        images_dict=images_dict,
-        scale_rows=False,
-        center_rows=False)
-
-    for negative_log_regularization_weight in [2, 3, 4]:
-        regularization_weight = 10.0 ** -negative_log_regularization_weight
-        table.add_entry(
-            solver=IterativeImputer(
-                n_nearest_features=80,
-                max_iter=50
-            ),
-            name="IterativeImputer_%d" % negative_log_regularization_weight)
-
-    for fill_method in ["mean", "median"]:
-        table.add_entry(
-            solver=SimpleFill(fill_method=fill_method),
-            name="SimpleFill_%s" % fill_method)
-
-    for k in [1, 3, 7]:
-        table.add_entry(
-            solver=KNN(
-                k=k,
-                orientation="rows"),
-            name="KNN_k%d" % (k,))
-
-    for shrinkage_value in [25, 50, 100]:
-        # SoftImpute without rank constraints
-        table.add_entry(
-            solver=SoftImpute(
-                shrinkage_value=shrinkage_value),
-            name="SoftImpute_lambda%d" % (shrinkage_value,))
+    table = ResultsTable(images_dict=images_dict, scale_rows=False, center_rows=False)
 
     for rank in [10, 20, 40]:
         table.add_entry(
-            solver=IterativeSVD(
-                rank=rank,
-                init_fill_method="zero"),
-            name="IterativeSVD_rank%d" % (rank,))
+            solver=IterativeSVD(rank=rank, init_fill_method="zero"),
+            name="IterativeSVD_rank%d" % (rank,),
+        )
 
     table.save_html_table()
     table.print_sorted_errors()
