@@ -55,6 +55,7 @@ if __name__ == "__main__":
             "scikit-learn>=0.24.2",
             # used by NuclearNormMinimization
             "cvxpy==1.1.13",
+            "cvxopt",
             "numpy==1.19.5",  # tensorflow is harsh about numpy version
             # used by MatrixFactorization
             "keras>=2.4.3",
