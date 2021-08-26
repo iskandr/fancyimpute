@@ -1,7 +1,8 @@
-tensorflow==2.5
-keras==2.4.3
+knnimpute>=0.1.0
+scikit-learn>=0.24.2
+# used by NuclearNormMinimization
 cvxpy==1.1.13
-scikit-learn>=0.21.2
-numpy==1.19.5
-scipy==1.6.3
-knnimpute==0.1.0
+numpy==1.19.5  # tensorflow is harsh about numpy version
+# used by MatrixFactorization
+keras>=2.4.3
+tensorflow>=2.5.1
