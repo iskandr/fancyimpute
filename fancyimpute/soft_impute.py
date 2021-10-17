@@ -113,7 +113,8 @@ class SoftImpute(Solver):
             (U, s, V) = randomized_svd(
                 X,
                 max_rank,
-                n_iter=self.n_power_iterations)
+                n_iter=self.n_power_iterations,
+                random_state=None)
         else:
             # perform a full rank SVD using ARPACK
             (U, s, V) = np.linalg.svd(
@@ -134,7 +135,8 @@ class SoftImpute(Solver):
         _, s, _ = randomized_svd(
             X_filled,
             1,
-            n_iter=5)
+            n_iter=5,
+            random_state=None)
         return s[0]
 
     def solve(self, X, missing_mask):
