@@ -14,7 +14,7 @@ from .similarity_weighted_averaging import SimilarityWeightedAveraging
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 
-__version__ = "0.6.1"
+__version__ = "0.7.0"
 
 __all__ = [
     "Solver",
