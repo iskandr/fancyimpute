@@ -54,12 +54,10 @@ if __name__ == "__main__":
             "knnimpute>=0.1.0",
             "scikit-learn>=0.24.2",
             # used by NuclearNormMinimization
-            "cvxpy==1.1.13",
+            "cvxpy",
             "cvxopt",
-            "numpy==1.19.5",  # tensorflow is harsh about numpy version
-            # used by MatrixFactorization
-            "keras>=2.4.3",
-            "tensorflow>=2.5.1",
+            "pytest",
+            "nose",
         ],
         long_description=readme_markdown,
         long_description_content_type="text/markdown",

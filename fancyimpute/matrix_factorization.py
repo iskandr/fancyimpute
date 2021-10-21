@@ -11,105 +11,115 @@
 # limitations under the License.
 
 import numpy as np
-from tensorflow.keras import regularizers
-from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.layers import Input
-from tensorflow.keras.models import Model
-from sklearn.utils import shuffle, check_array
-
-from .common import import_from
-from .scaler import Scaler
-from .keras_models import KerasMatrixFactorizer
+from sklearn.utils import check_array
 from .solver import Solver
+from .common import masked_mae
 
 
 class MatrixFactorization(Solver):
-    """
-    Given an incomplete (m,n) matrix X, factorize it into
-    U, V where U.shape = (m, k) and V.shape = (k, n).
-
-    The U, V are found by minimizing the difference between U.dot.V and
-    X at the observed entries along with a sparsity penalty for U and an
-    L2 penalty for V.
-    """
-
     def __init__(
         self,
-        rank=10,
-        learning_rate=0.001,
-        epochs=10000,
-        patience=5,
-        l2_penalty=1e-5,
-        use_bias=True,
-        min_improvement=0.001,
-        optimization_algorithm="Nadam",
-        loss="mse",
-        validation_frac=0.1,
+        rank=40,
+        learning_rate=0.01,
+        max_iters=50,
+        shrinkage_value=0,
         min_value=None,
         max_value=None,
-        normalizer=Scaler(),
         verbose=True,
     ):
-        Solver.__init__(self, min_value=min_value, max_value=max_value, normalizer=normalizer)
+        """
+        Train a matrix factorization model to predict empty
+        entries in a matrix. Mostly copied (with permission) from:
+        https://blog.insightdatascience.com/explicit-matrix-factorization-als-sgd-and-all-that-jazz-b00e4d9b21ea
+
+        Params
+        =====+
+        rank : (int)
+            Number of latent factors to use in matrix
+            factorization model
+
+        learning_rate : (float)
+            Learning rate for optimizer
+
+        max_iters : (int)
+            Number of max_iters to train for
+
+        shrinkage_value : (float)
+            Regularization term for sgd penalty
+
+        min_value : float
+            Smallest possible imputed value
+
+        max_value : float
+            Largest possible imputed value
+
+        verbose : (bool)
+            Whether or not to printout training progress
+        """
+        Solver.__init__(self, min_value=min_value, max_value=max_value)
         self.rank = rank
         self.learning_rate = learning_rate
-        self.epochs = epochs
-        self.patience = patience
-        self.l2_penalty = l2_penalty
-        self.use_bias = use_bias
-        self.optimization_algorithm = optimization_algorithm
-        self.loss = loss
-        self.validation_frac = validation_frac
-        self.min_improvement = min_improvement
-        self.normalizer = normalizer
-        self.verbose = verbose
+        self.max_iters = max_iters
+        self.shrinkage_value = shrinkage_value
+        self._v = verbose
 
     def solve(self, X, missing_mask):
+        """ Train model for max_iters iterations from scratch."""
         X = check_array(X, force_all_finite=False)
 
         # shape data to fit into keras model
         (n_samples, n_features) = X.shape
         observed_mask = ~missing_mask
-        missing_mask_flat = missing_mask.flatten()
-        observed_mask_flat = observed_mask.flatten()
+        training_indices = list(zip(*np.where(observed_mask)))
 
-        columns, rows = np.meshgrid(np.arange(n_features), np.arange(n_samples))
+        self.user_vecs = np.random.normal(scale=1.0 / self.rank, size=(n_samples, self.rank))
+        self.item_vecs = np.random.normal(scale=1.0 / self.rank, size=(n_features, self.rank))
 
-        # training data
-        i_tr = rows.flatten()[observed_mask_flat]
-        j_tr = columns.flatten()[observed_mask_flat]
-        ij_tr = np.vstack([i_tr, j_tr]).T  # input to factorizer
-        y_tr = X.flatten()[observed_mask_flat]  # output of factorizer
-        ij_tr, y_tr = shuffle(ij_tr, y_tr)
+        self.user_bias = np.zeros(n_samples)
+        self.item_bias = np.zeros(n_features)
+        self.global_bias = np.mean(X[observed_mask])
 
-        # make a keras model
-        main_input = Input(shape=(2,), dtype="int32")
-        embed = KerasMatrixFactorizer(
-            rank=self.rank,
-            input_dim_i=n_samples,
-            input_dim_j=n_features,
-            embeddings_regularizer=regularizers.l2(self.l2_penalty),
-            use_bias=self.use_bias,
-        )(main_input)
-        model = Model(inputs=main_input, outputs=embed)
-        optimizer = import_from("tensorflow.keras.optimizers", self.optimization_algorithm)(lr=self.learning_rate)
-        model.compile(optimizer=optimizer, loss=self.loss)
-        callbacks = [EarlyStopping(patience=self.patience, min_delta=self.min_improvement)]
-        model.fit(
-            ij_tr,
-            y_tr,
-            batch_size=int(len(y_tr) * (1 - self.validation_frac)),
-            epochs=self.epochs,
-            validation_split=self.validation_frac,
-            callbacks=callbacks,
-            shuffle=True,
-            verbose=self.verbose,
-        )
+        for i in range(self.max_iters):
+            # to do: early stopping
+            if (i + 1) % 10 == 0 and self._v:
+                X_reconstruction = self.clip(self.predict_all())
+                mae = masked_mae(X_true=X, X_pred=X_reconstruction, mask=observed_mask)
+                print("[MatrixFactorization] Iter %d: observed MAE=%0.6f rank=%d" % (i + 1, mae, self.rank))
 
-        # reassemble the original X
-        i_ts = rows.flatten()[missing_mask_flat]
-        j_ts = columns.flatten()[missing_mask_flat]
-        ij_ts = np.vstack([i_ts, j_ts]).T  # input to factorizer
-        X[i_ts, j_ts] = model.predict(ij_ts).T[0]
+            np.random.shuffle(training_indices)
+            self.sgd(X, training_indices)
+            i += 1
 
-        return X
+        X_filled = X.copy()
+        X_filled[missing_mask] = self.clip(self.predict_all()[missing_mask])
+        return X_filled
+
+    def sgd(self, X, training_indices):
+        # to do: batch learning
+        for (u, i) in training_indices:
+            prediction = self.predict(u, i)
+            e = X[u, i] - prediction  # error
+
+            # Update biases
+            self.user_bias[u] += self.learning_rate * (e - self.shrinkage_value * self.user_bias[u])
+            self.item_bias[i] += self.learning_rate * (e - self.shrinkage_value * self.item_bias[i])
+
+            # Update latent factors
+            self.user_vecs[u, :] += self.learning_rate * (
+                e * self.item_vecs[i, :] - self.shrinkage_value * self.user_vecs[u, :]
+            )
+            self.item_vecs[i, :] += self.learning_rate * (
+                e * self.user_vecs[u, :] - self.shrinkage_value * self.item_vecs[i, :]
+            )
+
+    def predict(self, u, i):
+        """ Single user and item prediction."""
+        prediction = self.global_bias + self.user_bias[u] + self.item_bias[i]
+        prediction += self.user_vecs[u, :].dot(self.item_vecs[i, :].T)
+        return prediction
+
+    def predict_all(self):
+        """ Predict ratings for every user and item."""
+        predictions = self.user_vecs.dot(self.item_vecs.T)
+        predictions += self.global_bias + self.user_bias[:, np.newaxis] + self.item_bias[np.newaxis, :]
+        return predictions

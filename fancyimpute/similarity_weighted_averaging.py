@@ -35,13 +35,14 @@ class SimilarityWeightedAveraging(object):
     """
 
     def __init__(
-            self,
-            min_weight_for_similarity=0.1,
-            min_count_for_similarity=2,
-            similarity_exponent=4.0,
-            shrinkage_coef=0.0001,
-            orientation="rows",
-            verbose=False):
+        self,
+        min_weight_for_similarity=0.1,
+        min_count_for_similarity=2,
+        similarity_exponent=4.0,
+        shrinkage_value=0.0001,
+        orientation="rows",
+        verbose=False,
+    ):
         """
         Parameters
         ----------
@@ -57,7 +58,7 @@ class SimilarityWeightedAveraging(object):
             Exponent for turning similarities into weights on values of other
             columns.
 
-        shrinkage_coef : float
+        shrinkage_value : float
             Shrinks reconstructed values toward 0
 
         orientation : str
@@ -68,7 +69,7 @@ class SimilarityWeightedAveraging(object):
         self.min_weight_for_similarity = min_weight_for_similarity
         self.min_count_for_similarity = min_count_for_similarity
         self.similarity_exponent = similarity_exponent
-        self.shrinkage_coef = shrinkage_coef
+        self.shrinkage_value = shrinkage_value
         self.orientation = orientation
         self.verbose = verbose
 
@@ -109,9 +110,7 @@ class SimilarityWeightedAveraging(object):
                 sims[(a, b)] = total / weight
         return sims, overlaps, weights
 
-    def complete_dict(
-            self,
-            values_dict):
+    def complete_dict(self, values_dict):
         """
         Keys of nested dictionaries can be arbitrary objects.
         """
@@ -122,22 +121,19 @@ class SimilarityWeightedAveraging(object):
         if self.verbose:
             print("[SimilarityWeightedAveraging] # rows = %d" % (len(row_keys)))
             print("[SimilarityWeightedAveraging] # columns = %d" % (len(column_keys)))
-        similarities, overlaps, weights = \
-            self.jacard_similarity_from_nested_dicts(values_dict)
+        similarities, overlaps, weights = self.jacard_similarity_from_nested_dicts(values_dict)
         if self.verbose:
-            print(
-                "[SimilarityWeightedAveraging] Computed %d similarities between rows" % (
-                    len(similarities),))
+            print("[SimilarityWeightedAveraging] Computed %d similarities between rows" % (len(similarities),))
         column_to_row_values = reverse_lookup_from_nested_dict(values_dict)
 
         result = defaultdict(dict)
 
         exponent = self.similarity_exponent
-        shrinkage_coef = self.shrinkage_coef
+        shrinkage_value = self.shrinkage_value
         for i, row_key in enumerate(row_keys):
             for column_key, value_triplets in column_to_row_values.items():
                 total = 0
-                denom = shrinkage_coef
+                denom = shrinkage_value
                 for (other_row_key, y) in value_triplets:
                     sample_weight = 1.0
                     sim = similarities.get((row_key, other_row_key), 0)
@@ -145,7 +141,7 @@ class SimilarityWeightedAveraging(object):
                     combined_weight *= sample_weight
                     total += combined_weight * y
                     denom += combined_weight
-                if denom > shrinkage_coef:
+                if denom > shrinkage_value:
                     result[row_key][column_key] = total / denom
         if self.orientation != "rows":
             result = transpose_nested_dictionary(result)
@@ -155,17 +151,12 @@ class SimilarityWeightedAveraging(object):
         X = check_array(X, force_all_finite=False)
 
         if self.verbose:
-            print(
-                ("[SimilarityWeightedAveraging] Creating dictionary from matrix "
-                 " with shape %s") % (X.shape,))
+            print(("[SimilarityWeightedAveraging] Creating dictionary from matrix " " with shape %s") % (X.shape,))
         missing_mask = np.isnan(X)
         observed_mask = ~missing_mask
-        sparse_dict = matrix_to_nested_dictionary(
-            X,
-            filter_fn=np.isfinite)
+        sparse_dict = matrix_to_nested_dictionary(X, filter_fn=np.isfinite)
 
-        completed_dict = self.complete_dict(
-            sparse_dict)
+        completed_dict = self.complete_dict(sparse_dict)
         array_result = np.zeros_like(X)
         for row_idx, row_dict in completed_dict.items():
             for col_idx, value in row_dict.items():
