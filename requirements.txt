@@ -3,3 +3,6 @@ scikit-learn>=0.24.2
 # used by NuclearNormMinimization
 cvxpy
 cvxopt
+# for tests
+pytest
+nose 
