@@ -79,7 +79,7 @@ If you use `fancyimpute` in your academic publication, please cite it as follows
   author = {Alex Rubinsteyn and Sergey Feldman},
   title={fancyimpute: An Imputation Library for Python},
   url = {https://github.com/iskandr/fancyimpute},
-  version = {0.5.4},
+  version = {0.7.0},
   date = {2016},
 }
 ```
