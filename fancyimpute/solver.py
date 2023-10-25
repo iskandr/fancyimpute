@@ -182,17 +182,21 @@ class Solver(object):
                 "Expected %s.fill() to return NumPy array but got %s" % (
                     self.__class__.__name__,
                     type(X_filled)))
+        # check if there is any missing data
+        if ((missing_mask == True).any()):
+            X_result = self.solve(X_filled, missing_mask)
 
-        X_result = self.solve(X_filled, missing_mask)
-        if not isinstance(X_result, np.ndarray):
-            raise TypeError(
-                "Expected %s.solve() to return NumPy array but got %s" % (
-                    self.__class__.__name__,
-                    type(X_result)))
+            if not isinstance(X_result, np.ndarray):
+                raise TypeError(
+                    "Expected %s.solve() to return NumPy array but got %s" % (
+                        self.__class__.__name__,
+                        type(X_result)))
 
-        X_result = self.project_result(X=X_result)
-        X_result[observed_mask] = X_original[observed_mask]
-        return X_result
+            X_result = self.project_result(X=X_result)
+            X_result[observed_mask] = X_original[observed_mask]
+            return X_result
+        else:
+            return X_filled
 
     def fit(self, X, y=None):
         """
